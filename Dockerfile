@@ -54,7 +54,7 @@ USER appuser
 # Expose ports
 # 8080: HTTP server for web UI
 # 3000: WebSocket server for audio/communication
-EXPOSE 8080 3000
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

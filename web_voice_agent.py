@@ -244,7 +244,7 @@ class WebVoiceAgent:
                     if transcript and transcript.strip():
                         self.asked_to_repeat = False
                         
-                        # Deepgram sends cumulative transcripts - strip ALL previously processed text
+                        # Azure Speech sends cumulative transcripts - strip ALL previously processed text
                         original_transcript = transcript.strip()
                         transcript = self._strip_processed_text(original_transcript)
                         
@@ -255,7 +255,7 @@ class WebVoiceAgent:
                         # Check if this transcript arrived too late (after we already started processing)
                         current_time = asyncio.get_event_loop().time()
                         
-                        # Ignore late-arriving transcripts (refined versions from Deepgram)
+                        # Ignore late-arriving transcripts (refined versions from Azure Speech)
                         if self._is_late_transcript(current_time):
                             time_since = current_time - self.last_processed_time
                             print(f"🔄 Ignoring late transcript ({time_since:.1f}s after processing started): '{transcript}'")
@@ -341,7 +341,7 @@ class WebVoiceAgent:
                             is_duplicate = False
                             time_since_processed = current_time - self.last_processed_time
                             
-                            # 1. Ignore late-arriving transcripts (Deepgram refined versions)
+                            # 1. Ignore late-arriving transcripts (Azure Speech refined versions)
                             if self._is_late_transcript(current_time):
                                 print(f"🔄 Ignoring late transcript ({time_since_processed:.1f}s after last): '{complete_text}'")
                                 is_duplicate = True
@@ -486,7 +486,7 @@ class WebVoiceAgent:
             return False
     
     async def process_message(self, websocket, user_text: str):
-        """Process user message through LLM and TTS"""
+        """Process user message through LLM and TTS with streaming for faster response"""
         try:
             # Notify thinking
             if not await self._safe_send(websocket, {
@@ -498,50 +498,75 @@ class WebVoiceAgent:
             if config.DEBUG:
                 print("🤖 Thinking...")
             
-            # Get LLM response
-            response_text = await self.llm.generate_response(user_text)
+            # Use streaming response for faster time-to-first-audio
+            full_response = []
+            first_audio_sent = False
             
-            if config.DEBUG:
-                print(f"💬 AI: {response_text}\n")
-            
-            # Send text response
-            if not await self._safe_send(websocket, {
-                'type': 'response_text',
-                'text': response_text
-            }):
-                return  # Connection closed
-            
-            # Synthesize speech
-            if config.DEBUG:
-                print("🔊 Synthesizing speech...")
-            
-            audio_data = await self.tts.synthesize(response_text)
-            
-            if audio_data:
-                # Send audio in chunks
-                chunk_size = 8192
-                for i in range(0, len(audio_data), chunk_size):
-                    chunk = audio_data[i:i + chunk_size]
-                    if not await self._safe_send(websocket, {
-                        'type': 'audio_chunk',
-                        'audio': base64.b64encode(chunk).decode('utf-8')
-                    }):
-                        return  # Connection closed
+            async for sentence, is_final in self.llm.generate_response_streaming(user_text):
+                if not sentence:
+                    continue
+                    
+                full_response.append(sentence)
                 
-                # Send completion
-                await self._safe_send(websocket, {
-                    'type': 'audio_complete'
-                })
+                # Send text progressively
+                current_text = ' '.join(full_response)
+                if not await self._safe_send(websocket, {
+                    'type': 'response_text',
+                    'text': current_text,
+                    'is_streaming': not is_final
+                }):
+                    return  # Connection closed
                 
-                if config.DEBUG:
-                    print(f"✓ Audio sent ({len(audio_data)} bytes)")
+                # Synthesize and send audio for this sentence immediately
+                if sentence.strip():
+                    if config.DEBUG and not first_audio_sent:
+                        print("🔊 Starting TTS for first sentence...")
+                        first_audio_sent = True
+                    
+                    audio_data = await self.tts.synthesize(sentence)
+                    
+                    if audio_data:
+                        # Send audio in chunks
+                        chunk_size = 8192
+                        for i in range(0, len(audio_data), chunk_size):
+                            chunk = audio_data[i:i + chunk_size]
+                            if not await self._safe_send(websocket, {
+                                'type': 'audio_chunk',
+                                'audio': base64.b64encode(chunk).decode('utf-8')
+                            }):
+                                return  # Connection closed
+            
+            # Check for any form updates from the LLM (via form_tools)
+            try:
+                from mcp_tools.form_tools import get_pending_form_updates
+                form_updates = get_pending_form_updates()
+                if form_updates:
+                    for update in form_updates:
+                        for conn in self.active_connections:
+                            try:
+                                await conn.send(json.dumps(update))
+                            except:
+                                pass
+                    if config.DEBUG:
+                        print(f"📝 Sent {len(form_updates)} form update(s)")
+            except ImportError:
+                pass
+            
+            # Send completion signal
+            await self._safe_send(websocket, {
+                'type': 'audio_complete'
+            })
+            
+            final_text = ' '.join(full_response)
+            if config.DEBUG:
+                print(f"💬 AI: {final_text[:100]}..." if len(final_text) > 100 else f"💬 AI: {final_text}")
         
         except Exception as e:
             print(f"❌ Error processing message: {e}")
             import traceback
             traceback.print_exc()
             
-            # Send error to client (with connection check)
+            # Send error to client
             await self._safe_send(websocket, {
                 'type': 'error',
                 'message': 'Failed to process your message. Please try again.'
@@ -691,16 +716,7 @@ async def main():
     print("=" * 70)
     print()
     
-    # Diagnostic: Print environment configuration (for troubleshooting Cloud Run issues)
-    if config.DEBUG and config.USE_AZURE:
-        print("🔍 Environment Configuration Diagnostics:")
-        print(f"   USE_AZURE: {config.USE_AZURE}")
-        print(f"   AZURE_OPENAI_ENDPOINT: {config.AZURE_OPENAI_ENDPOINT}")
-        print(f"   AZURE_OPENAI_DEPLOYMENT: {config.AZURE_OPENAI_DEPLOYMENT}")
-        print(f"   AZURE_API_VERSION: {config.AZURE_API_VERSION}")
-        api_key_set = "SET" if config.AZURE_OPENAI_API_KEY else "NOT SET"
-        print(f"   AZURE_OPENAI_API_KEY: {api_key_set}")
-        print()
+
     
     agent = WebVoiceAgent()
     await agent.initialize()

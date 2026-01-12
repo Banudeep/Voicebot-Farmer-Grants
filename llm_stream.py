@@ -1,290 +1,471 @@
 """
 LLM Streaming Module
-Streaming text generation using OpenAI GPT-4
+Streaming text generation using Azure OpenAI Responses API
 """
 import asyncio
 import json
-from openai import AsyncOpenAI
-from contextlib import AsyncExitStack
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 from pathlib import Path
 import config
 
-# Try importing httpx for direct HTTP requests (for Azure OpenAI)
+# Logging
+from logging_config import get_logger
+logger = get_logger("voicebot.llm")
+
+# Result formatting
+from result_formatter import format_tool_result, log_tool_result
+
+# Centralized tool registry
+from mcp_tools import get_all_tools, get_all_functions
+
+# HTTP client for Azure OpenAI
 try:
     import httpx
     HAS_HTTPX = True
 except ImportError:
     HAS_HTTPX = False
 
+# Retry logic for API calls
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+    HAS_TENACITY = True
+except ImportError:
+    HAS_TENACITY = False
+    # Fallback: no-op decorator
+    def retry(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    stop_after_attempt = lambda x: None
+    wait_exponential = lambda **kwargs: None
+    retry_if_exception_type = lambda x: None
+
 class LLMStream:
     """Streaming language model processor"""
     
     def __init__(self):
-        # Initialize OpenAI client (Azure or standard)
-        if config.USE_AZURE:
-            # Validate required Azure OpenAI configuration
-            if not all([config.AZURE_OPENAI_ENDPOINT, config.AZURE_OPENAI_API_KEY, config.AZURE_OPENAI_DEPLOYMENT]):
-                raise ValueError(
-                    "Azure OpenAI requires AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, "
-                    "and AZURE_OPENAI_DEPLOYMENT environment variables"
-                )
-            
-            # Clean up endpoint - remove trailing slashes (like STS implementation)
-            endpoint = config.AZURE_OPENAI_ENDPOINT.rstrip('/')
-            
-            # For Azure OpenAI Chat Completions API, deployment MUST be in base_url path
-            # The SDK does NOT automatically add /deployments/{model} when using Azure
-            # Format: {endpoint}/openai/deployments/{deployment}
-            # The SDK will then construct: {base_url}/chat/completions
-            # Final URL: {endpoint}/openai/deployments/{deployment}/chat/completions
-            base_url = f"{endpoint}/openai/deployments/{config.AZURE_OPENAI_DEPLOYMENT}"
-            
-            # Initialize Azure OpenAI client
-            # Try with default_query first (preferred method)
-            try:
-                self.client = AsyncOpenAI(
-                    api_key=config.AZURE_OPENAI_API_KEY,
-                    base_url=base_url,
-                    default_query={"api-version": config.AZURE_API_VERSION}
-                )
-            except TypeError:
-                # Fallback: include api-version in base_url for older OpenAI library versions
-                base_url = f"{base_url}?api-version={config.AZURE_API_VERSION}"
-                self.client = AsyncOpenAI(
-                    api_key=config.AZURE_OPENAI_API_KEY,
-                    base_url=base_url
-                )
-            
-            # Store original endpoint for debugging
-            self._azure_endpoint = endpoint
-            self._azure_base_url = base_url
-            
-            # When deployment is in base_url path, we can use a dummy model name or the deployment name
-            # The SDK will use the deployment from the base_url path
-            self.model = config.AZURE_OPENAI_DEPLOYMENT  # Still use deployment name for compatibility
-            
-            if config.DEBUG:
-                print(f"✓ Using Azure OpenAI Chat Completions API")
-                print(f"  Endpoint: {config.AZURE_OPENAI_ENDPOINT}")
-                print(f"  Deployment: '{config.AZURE_OPENAI_DEPLOYMENT}'")
-                print(f"  API Version: {config.AZURE_API_VERSION}")
-                print(f"  Base URL: {base_url}")
-                
-                # Diagnostic: Check environment variable values (masked)
-                api_key_preview = config.AZURE_OPENAI_API_KEY[:8] + "..." + config.AZURE_OPENAI_API_KEY[-4] if config.AZURE_OPENAI_API_KEY and len(config.AZURE_OPENAI_API_KEY) > 12 else "NOT SET"
-                print(f"  API Key: {api_key_preview}")
-                print(f"  USE_AZURE: {config.USE_AZURE}")
-                
-                # Check for common issues
-                import os
-                raw_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
-                if raw_deployment and (raw_deployment.startswith('"') or raw_deployment.startswith("'") or raw_deployment.endswith('"') or raw_deployment.endswith("'")):
-                    print(f"\n  ⚠️  WARNING: Deployment name had quotes! Original: '{raw_deployment}'")
-                    print(f"     Stripped to: '{config.AZURE_OPENAI_DEPLOYMENT}'")
-                    print(f"     If you still see 404 errors, check Cloud Run environment variables")
-                    print(f"     and remove quotes from AZURE_OPENAI_DEPLOYMENT value.")
-                
-                # Validate API version format
-                valid_versions = ["2025-01-01-preview", "2024-10-01-preview", "2024-02-15-preview", "2023-12-01-preview", "2023-05-15"]
-                if config.AZURE_API_VERSION not in valid_versions:
-                    print(f"\n  ℹ️  Using API version: {config.AZURE_API_VERSION}")
-                    print(f"     (Common versions: {', '.join(valid_versions[:3])})")
-                
-                print(f"\n  ⚠️  IMPORTANT: The deployment name '{config.AZURE_OPENAI_DEPLOYMENT}'")
-                print(f"     must be a Chat Completions deployment, NOT a Realtime API deployment.")
-                print(f"     If you see 404 errors, check:")
-                print(f"     1. Deployment exists in Azure Portal")
-                print(f"     2. Deployment is for 'Chat Completions' (not Realtime API)")
-                print(f"     3. Deployment name matches exactly (case-sensitive)")
-                print(f"     4. API version is valid (try: 2024-10-01-preview)")
-                print(f"     5. API key has access to this deployment")
-                print(f"     6. Environment variables are set in Cloud Run deployment")
-        else:
-            # Standard OpenAI
-            if not config.OPENAI_API_KEY:
-                raise ValueError("OPENAI_API_KEY is required when not using Azure")
-            
-            self.client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
-            self.model = config.OPENAI_MODEL
-            if config.DEBUG:
-                print(f"✓ Using OpenAI: {config.OPENAI_MODEL}")
+        # Validate required Azure OpenAI configuration
+        if not all([config.AZURE_OPENAI_ENDPOINT, config.AZURE_OPENAI_API_KEY, config.AZURE_OPENAI_DEPLOYMENT]):
+            raise ValueError(
+                "Azure OpenAI requires AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, "
+                "and AZURE_OPENAI_DEPLOYMENT environment variables"
+            )
+        
+        # Store endpoint (clean up trailing slashes)
+        self._azure_endpoint = config.AZURE_OPENAI_ENDPOINT.rstrip('/')
+        self.model = config.AZURE_OPENAI_DEPLOYMENT
+        
+        # Responses API: Store reasoning ID for chain-of-thought between turns
+        self.reasoning_id = None
+        
+        if config.DEBUG:
+            logger.info("Using Azure OpenAI Responses API")
+            logger.info(f"  Deployment: '{config.AZURE_OPENAI_DEPLOYMENT}'")
+            logger.info(f"  API Version: {config.AZURE_API_VERSION}")
         
         self.conversation_history = []
         self.system_prompt = config.SYSTEM_PROMPT
         
-        # MCP setup
-        self.mcp_session = None
-        self.exit_stack = AsyncExitStack()
+        # Load tools from centralized registry
+        self.all_tools = get_all_tools()
+        self.tool_functions = get_all_functions()
         
+        if config.DEBUG and self.all_tools:
+            logger.info(f"Total tools available: {len(self.all_tools)}")
+    
     async def initialize(self):
-        """Initialize LLM and optional MCP tools"""
-        if config.ENABLE_TOOLS:
-            await self._connect_mcp()
-        
+        """Initialize LLM and tools"""
         if config.DEBUG:
-            print("✓ LLM initialized")
+            logger.info("LLM initialized")
+            if self.all_tools:
+                tool_names = [t.get('function', {}).get('name', t.get('name', 'unknown')) for t in self.all_tools]
+                logger.debug(f"Available tools: {', '.join(tool_names)}")
     
-    async def _connect_mcp(self):
-        """Connect to MCP server for tool access"""
-        try:
-            server_path = Path(__file__).parent / config.MCP_SERVER_PATH
-            
-            if not server_path.exists():
-                if config.VERBOSE:
-                    print(f"⚠️ MCP server not found at {server_path}")
-                return
-            
-            server_params = StdioServerParameters(
-                command="python",
-                args=[str(server_path)]
-            )
-            
-            stdio_transport = await self.exit_stack.enter_async_context(
-                stdio_client(server_params)
-            )
-            stdio, write = stdio_transport
-            
-            self.mcp_session = await self.exit_stack.enter_async_context(
-                ClientSession(stdio, write)
-            )
-            
-            await self.mcp_session.initialize()
-            
-            tools_result = await self.mcp_session.list_tools()
-            
-            if config.DEBUG:
-                print(f"✓ MCP connected ({len(tools_result.tools)} tools)")
-                
-        except Exception as e:
-            if config.VERBOSE:
-                print(f"⚠️ MCP connection failed: {e}")
+    async def _get_tools(self):
+        """Get available tools in OpenAI format"""
+        if not config.ENABLE_TOOLS:
+            return []
+        return self.all_tools
     
-    async def _get_mcp_tools(self):
-        """Get available MCP tools in OpenAI format"""
-        if not self.mcp_session:
+    def _format_tools_for_azure(self, tools):
+        """Convert tools format for Azure OpenAI (nested function structure)"""
+        if not tools:
             return []
         
-        tools_result = await self.mcp_session.list_tools()
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.inputSchema,
-                },
-            }
-            for tool in tools_result.tools
-        ]
+        formatted_tools = []
+        for tool in tools:
+            # Check if already in Azure format (has 'function' key)
+            if "function" in tool:
+                formatted_tools.append(tool)
+            else:
+                # Convert from OpenAI format to Azure format
+                # OpenAI format: {type: "function", name: "...", description: "...", parameters: {...}}
+                # Azure format: {type: "function", function: {name: "...", description: "...", parameters: {...}}}
+                formatted_tool = {
+                    "type": tool.get("type", "function"),
+                    "function": {
+                        "name": tool.get("name", ""),
+                        "description": tool.get("description", ""),
+                        "parameters": tool.get("parameters", {})
+                    }
+                }
+                formatted_tools.append(formatted_tool)
+        
+        return formatted_tools
     
-    async def _azure_direct_http(self, messages, tools, stream_callback):
-        """Use direct HTTP requests for Azure OpenAI (SDK doesn't handle deployment in base_url correctly)"""
+    async def _execute_tool(self, tool_name: str, arguments: dict) -> str:
+        """Execute a tool function directly"""
+        if tool_name not in self.tool_functions:
+            error_msg = f"Tool '{tool_name}' not found"
+            logger.error(error_msg)
+            return json.dumps({"error": error_msg})
+        
+        try:
+            tool_func = self.tool_functions[tool_name]
+            
+            # Validate required arguments by checking function signature
+            import inspect
+            sig = inspect.signature(tool_func)
+            required_params = [p.name for p in sig.parameters.values() 
+                             if p.default == inspect.Parameter.empty and p.name != 'self']
+            
+            missing_params = [p for p in required_params if p not in arguments]
+            if missing_params:
+                error_msg = f"Tool '{tool_name}' missing required arguments: {', '.join(missing_params)}"
+                logger.error(f"{error_msg}. Provided: {list(arguments.keys())}")
+                logger.debug(f"Function signature: {sig}")
+                return json.dumps({
+                    "error": error_msg,
+                    "missing_parameters": missing_params,
+                    "provided_arguments": list(arguments.keys()),
+                    "required_parameters": required_params
+                })
+            
+            # Check if it's an async function
+            if asyncio.iscoroutinefunction(tool_func):
+                result = await tool_func(**arguments)
+            else:
+                # Run sync function in executor
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, lambda: tool_func(**arguments))
+            
+            # Log tool result using result_formatter
+            log_tool_result(tool_name, result)
+            
+            # Format result for LLM consumption using result_formatter
+            return format_tool_result(result)
+                
+        except TypeError as e:
+            error_msg = str(e)
+            if "missing" in error_msg.lower() and "required" in error_msg.lower():
+                logger.error(f"Tool '{tool_name}' argument error: {error_msg}")
+                logger.debug(f"Provided arguments: {arguments}")
+                import inspect
+                sig = inspect.signature(tool_func)
+                return json.dumps({
+                    "error": f"Missing required arguments for '{tool_name}': {error_msg}",
+                    "provided_arguments": arguments,
+                    "function_signature": str(sig)
+                })
+            else:
+                raise
+        except Exception as e:
+            error_msg = f"Error executing tool '{tool_name}': {str(e)}"
+            logger.error(error_msg)
+            logger.debug(f"Arguments: {arguments}")
+            if config.DEBUG:
+                import traceback
+                logger.exception("Tool execution traceback")
+            return json.dumps({"error": error_msg, "arguments": arguments})
+    
+    async def _azure_responses_api(self, messages, tools, stream_callback):
+        """Use Azure OpenAI Responses API (recommended for GPT-5 class models)
+        
+        Benefits over Chat Completions:
+        - Chain-of-thought (CoT) support for better reasoning
+        - Reduced reasoning token generation
+        - Higher cache hit rates and lower latency
+        """
         if not HAS_HTTPX:
-            raise RuntimeError("httpx is required for Azure OpenAI direct HTTP mode. Install with: pip install httpx")
+            raise RuntimeError("httpx is required for Azure OpenAI. Install with: pip install httpx")
         
         endpoint = config.AZURE_OPENAI_ENDPOINT.rstrip('/')
-        url = f"{endpoint}/openai/deployments/{config.AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version={config.AZURE_API_VERSION}"
+        # Responses API uses /openai/responses (NOT /openai/deployments/{deployment}/responses)
+        url = f"{endpoint}/openai/responses?api-version={config.AZURE_API_VERSION}"
         
         headers = {
             "api-key": config.AZURE_OPENAI_API_KEY,
             "Content-Type": "application/json"
         }
         
+        # Convert messages to Responses API input format
+        input_items = []
+        for msg in messages:
+            if msg.get("role") == "system":
+                input_items.append({
+                    "type": "message",
+                    "role": "system",
+                    "content": msg.get("content", "")
+                })
+            elif msg.get("role") == "user":
+                input_items.append({
+                    "type": "message",
+                    "role": "user",
+                    "content": msg.get("content", "")
+                })
+            elif msg.get("role") == "assistant":
+                if msg.get("tool_calls"):
+                    # Assistant message with tool calls
+                    for tc in msg["tool_calls"]:
+                        input_items.append({
+                            "type": "function_call",
+                            "call_id": tc.get("id", ""),
+                            "name": tc["function"]["name"],
+                            "arguments": tc["function"]["arguments"]
+                        })
+                elif msg.get("content"):
+                    input_items.append({
+                        "type": "message",
+                        "role": "assistant",
+                        "content": msg.get("content", "")
+                    })
+            elif msg.get("role") == "tool":
+                # Tool result
+                input_items.append({
+                    "type": "function_call_output",
+                    "call_id": msg.get("tool_call_id", ""),
+                    "output": msg.get("content", "")
+                })
+        
         payload = {
-            "messages": messages,
+            "model": config.AZURE_OPENAI_DEPLOYMENT,
+            "input": input_items,
             "temperature": config.OPENAI_TEMPERATURE,
-            "max_tokens": config.OPENAI_MAX_TOKENS
+            "max_output_tokens": config.OPENAI_MAX_TOKENS
         }
         
-        # Add tools if available (convert to Azure format if needed)
+        # Add chain-of-thought reasoning if we have a previous reasoning ID
+        if self.reasoning_id:
+            payload["reasoning"] = {"id": self.reasoning_id}
+        
+        # Add tools if available (Responses API uses flat format, not nested under 'function')
         if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+            formatted_tools = []
+            for tool in tools:
+                if "function" in tool:
+                    # Convert from Chat Completions format to Responses API format
+                    func = tool["function"]
+                    formatted_tools.append({
+                        "type": "function",
+                        "name": func.get("name", ""),
+                        "description": func.get("description", ""),
+                        "parameters": func.get("parameters", {})
+                    })
+                else:
+                    # Already in flat format or use as-is
+                    formatted_tools.append({
+                        "type": tool.get("type", "function"),
+                        "name": tool.get("name", ""),
+                        "description": tool.get("description", ""),
+                        "parameters": tool.get("parameters", {})
+                    })
+            payload["tools"] = formatted_tools
         
         if config.DEBUG:
-            print(f"  📡 Request URL: {url}")
-            print(f"  📦 Model/Deployment: {config.AZURE_OPENAI_DEPLOYMENT}")
+            logger.debug(f"Responses API URL: {url}")
+            logger.debug(f"Model/Deployment: {config.AZURE_OPENAI_DEPLOYMENT}")
+            if self.reasoning_id:
+                logger.debug(f"Using reasoning chain: {self.reasoning_id[:20]}...")
         
         async with httpx.AsyncClient(timeout=60.0) as client:
-            if stream_callback:
-                # Streaming request
-                payload["stream"] = True
-                async with client.stream("POST", url, headers=headers, json=payload) as response:
-                    response.raise_for_status()
-                    full_response = ""
-                    async for line in response.aiter_lines():
-                        if line.startswith("data: "):
-                            data_str = line[6:]  # Remove "data: " prefix
-                            if data_str == "[DONE]":
-                                break
-                            try:
-                                chunk_data = json.loads(data_str)
-                                if "choices" in chunk_data and len(chunk_data["choices"]) > 0:
-                                    delta = chunk_data["choices"][0].get("delta", {})
-                                    if "content" in delta:
-                                        content = delta["content"]
-                                        full_response += content
-                                        await stream_callback(content)
-                            except json.JSONDecodeError:
-                                continue
-                    
-                    # Add to history
-                    self.conversation_history.append({
-                        "role": "assistant",
-                        "content": full_response
-                    })
-                    
-                    return full_response
-            else:
-                # Non-streaming request
+            try:
                 response = await client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 result = response.json()
                 
-                assistant_message = result["choices"][0]["message"]
-                response_text = assistant_message.get("content", "")
+                # Parse Responses API output format
+                response_text = ""
+                tool_calls = []
                 
-                # Handle tool calls if present
-                if assistant_message.get("tool_calls") and self.mcp_session:
-                    # Execute tools (similar to SDK path)
-                    self.conversation_history.append(assistant_message)
+                # Store reasoning ID for next turn (chain-of-thought)
+                if result.get("reasoning", {}).get("id"):
+                    self.reasoning_id = result["reasoning"]["id"]
+                    if config.DEBUG:
+                        logger.debug("Stored reasoning ID for next turn")
+                
+                # Process output items
+                for item in result.get("output", []):
+                    item_type = item.get("type", "")
                     
-                    for tool_call in assistant_message["tool_calls"]:
-                        result = await self.mcp_session.call_tool(
-                            tool_call["function"]["name"],
-                            arguments=json.loads(tool_call["function"]["arguments"])
-                        )
-                        
-                        self.conversation_history.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call["id"],
-                            "content": result.content[0].text
+                    if item_type == "message":
+                        # Text response
+                        content = item.get("content", [])
+                        if isinstance(content, list):
+                            for c in content:
+                                if c.get("type") == "output_text":
+                                    response_text += c.get("text", "")
+                        elif isinstance(content, str):
+                            response_text += content
+                    
+                    elif item_type == "function_call":
+                        # Tool call
+                        tool_calls.append({
+                            "id": item.get("call_id", item.get("id", "")),
+                            "type": "function",
+                            "function": {
+                                "name": item.get("name", ""),
+                                "arguments": item.get("arguments", "{}")
+                            }
+                        })
+                
+                # Handle tool calls
+                max_tool_iterations = 10
+                iteration = 0
+                
+                while tool_calls and self.tool_functions and iteration < max_tool_iterations:
+                    iteration += 1
+                    if config.DEBUG:
+                        logger.debug(f"Tool call iteration {iteration}")
+                    
+                    # Add tool calls to conversation history (in original format for storage)
+                    self.conversation_history.append({
+                        "role": "assistant",
+                        "tool_calls": tool_calls
+                    })
+                    
+                    # Execute each tool and add results
+                    new_input_items = list(input_items)  # Start with current input
+                    
+                    # Add the function calls we just received
+                    for tc in tool_calls:
+                        new_input_items.append({
+                            "type": "function_call",
+                            "call_id": tc["id"],
+                            "name": tc["function"]["name"],
+                            "arguments": tc["function"]["arguments"]
                         })
                     
-                    # Get final response
-                    final_payload = {
-                        "messages": [
-                            {"role": "system", "content": self.system_prompt},
-                            *self.conversation_history
-                        ],
+                    for tc in tool_calls:
+                        tool_name = tc["function"]["name"]
+                        tool_args = json.loads(tc["function"]["arguments"])
+                        
+                        if config.DEBUG:
+                            logger.debug(f"Executing tool: {tool_name} with args: {tool_args}")
+                        
+                        tool_result = await self._execute_tool(tool_name, tool_args)
+                        
+                        # Truncate large results
+                        MAX_TOOL_CONTENT_SIZE = 8000
+                        if isinstance(tool_result, str) and len(tool_result) > MAX_TOOL_CONTENT_SIZE:
+                            logger.warning(f"Truncating large tool result ({len(tool_result)} chars)")
+                            tool_result = tool_result[:MAX_TOOL_CONTENT_SIZE] + f"\n... [truncated]"
+                        
+                        # Add to conversation history
+                        self.conversation_history.append({
+                            "role": "tool",
+                            "tool_call_id": tc["id"],
+                            "content": tool_result
+                        })
+                        
+                        # Add to input for next API call
+                        new_input_items.append({
+                            "type": "function_call_output",
+                            "call_id": tc["id"],
+                            "output": tool_result
+                        })
+                    
+                    # Make next request with tool results
+                    next_payload = {
+                        "model": config.AZURE_OPENAI_DEPLOYMENT,
+                        "input": new_input_items,
                         "temperature": config.OPENAI_TEMPERATURE,
-                        "max_tokens": config.OPENAI_MAX_TOKENS
+                        "max_output_tokens": config.OPENAI_MAX_TOKENS
                     }
                     
-                    final_response = await client.post(url, headers=headers, json=final_payload)
-                    final_response.raise_for_status()
-                    final_result = final_response.json()
-                    response_text = final_result["choices"][0]["message"]["content"]
+                    if self.reasoning_id:
+                        next_payload["reasoning"] = {"id": self.reasoning_id}
+                    
+                    if tools:
+                        # Format tools for Responses API (flat format)
+                        formatted_tools = []
+                        for tool in tools:
+                            if "function" in tool:
+                                func = tool["function"]
+                                formatted_tools.append({
+                                    "type": "function",
+                                    "name": func.get("name", ""),
+                                    "description": func.get("description", ""),
+                                    "parameters": func.get("parameters", {})
+                                })
+                            else:
+                                formatted_tools.append({
+                                    "type": tool.get("type", "function"),
+                                    "name": tool.get("name", ""),
+                                    "description": tool.get("description", ""),
+                                    "parameters": tool.get("parameters", {})
+                                })
+                        next_payload["tools"] = formatted_tools
+                    
+                    next_response = await client.post(url, headers=headers, json=next_payload)
+                    next_response.raise_for_status()
+                    next_result = next_response.json()
+                    
+                    # Update reasoning ID
+                    if next_result.get("reasoning", {}).get("id"):
+                        self.reasoning_id = next_result["reasoning"]["id"]
+                    
+                    # Parse new response
+                    response_text = ""
+                    tool_calls = []
+                    
+                    for item in next_result.get("output", []):
+                        item_type = item.get("type", "")
+                        
+                        if item_type == "message":
+                            content = item.get("content", [])
+                            if isinstance(content, list):
+                                for c in content:
+                                    if c.get("type") == "output_text":
+                                        response_text += c.get("text", "")
+                            elif isinstance(content, str):
+                                response_text += content
+                        
+                        elif item_type == "function_call":
+                            tool_calls.append({
+                                "id": item.get("call_id", item.get("id", "")),
+                                "type": "function",
+                                "function": {
+                                    "name": item.get("name", ""),
+                                    "arguments": item.get("arguments", "{}")
+                                }
+                            })
+                    
+                    # Update input_items for potential next iteration
+                    input_items = new_input_items
+                    
+                    if config.DEBUG:
+                        if tool_calls:
+                            logger.debug(f"LLM wants to make {len(tool_calls)} more tool call(s)")
+                        else:
+                            logger.debug(f"LLM finished tool calls, response: {response_text[:100] if response_text else '(empty)'}...")
                 
-                # Add to history
+                # Ensure we have a response
+                if not response_text or not response_text.strip():
+                    response_text = "I've retrieved the data but couldn't generate a response. Please try asking again."
+                
+                # Add final response to history
                 self.conversation_history.append({
                     "role": "assistant",
                     "content": response_text
                 })
                 
                 return response_text
+                
+            except httpx.HTTPStatusError as e:
+                error_text = e.response.text if hasattr(e.response, 'text') else str(e)
+                logger.error(f"Responses API error: {e.response.status_code}")
+                logger.error(f"Error details: {error_text[:500]}")
+                logger.debug(f"Request URL: {url}")
+                raise
     
     async def generate_response(self, user_message: str, stream_callback=None):
         """Generate response with optional streaming"""
@@ -305,110 +486,13 @@ class LLMStream:
         ]
         
         # Get tools
-        tools = await self._get_mcp_tools()
+        tools = await self._get_tools()
         
         try:
-            # For Azure OpenAI, use direct HTTP since SDK doesn't handle deployment in base_url correctly
-            if config.USE_AZURE and HAS_HTTPX:
-                return await self._azure_direct_http(messages, tools, stream_callback)
-            
-            # For standard OpenAI or if httpx not available, use SDK
-            # Prepare request parameters
-            request_params = {
-                "messages": messages,
-                "temperature": config.OPENAI_TEMPERATURE,
-                "max_tokens": config.OPENAI_MAX_TOKENS,
-                "stream": stream_callback is not None
-            }
-            
-            # For standard OpenAI, always pass model parameter
-            if not config.USE_AZURE:
-                request_params["model"] = self.model
-            else:
-                # For Azure with SDK, we need to pass model even though it's in base_url
-                # (SDK strips it from base_url and expects it as parameter)
-                request_params["model"] = self.model
-            
-            # Add tools if available
-            if tools:
-                request_params["tools"] = tools
-                request_params["tool_choice"] = "auto"
-            
-            # Debug: Show request details
-            if config.DEBUG:
-                if config.USE_AZURE:
-                    expected_url = f"{self._azure_endpoint}/openai/deployments/{self.model}/chat/completions?api-version={config.AZURE_API_VERSION}"
-                    print(f"  📡 Request URL: {expected_url}")
-                print(f"  📦 Model/Deployment: {self.model}")
-            
-            # Create completion
-            response = await self.client.chat.completions.create(**request_params)
-            
-            # Handle streaming
-            if stream_callback:
-                full_response = ""
-                async for chunk in response:
-                    if chunk.choices[0].delta.content:
-                        content = chunk.choices[0].delta.content
-                        full_response += content
-                        await stream_callback(content)
-                
-                # Add to history
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": full_response
-                })
-                
-                return full_response
-            else:
-                # Non-streaming
-                assistant_message = response.choices[0].message
-                
-                # Handle tool calls
-                if assistant_message.tool_calls and self.mcp_session:
-                    # Execute tools
-                    self.conversation_history.append(assistant_message)
-                    
-                    for tool_call in assistant_message.tool_calls:
-                        result = await self.mcp_session.call_tool(
-                            tool_call.function.name,
-                            arguments=json.loads(tool_call.function.arguments)
-                        )
-                        
-                        self.conversation_history.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": result.content[0].text
-                        })
-                    
-                    # Get final response
-                    # For Azure OpenAI, deployment is in base_url, so don't pass model parameter
-                    final_request_params = {
-                        "messages": [
-                            {"role": "system", "content": self.system_prompt},
-                            *self.conversation_history
-                        ],
-                        "temperature": config.OPENAI_TEMPERATURE,
-                        "max_tokens": config.OPENAI_MAX_TOKENS
-                    }
-                    
-                    # Only add model parameter for standard OpenAI
-                    if not config.USE_AZURE:
-                        final_request_params["model"] = self.model
-                    
-                    final_response = await self.client.chat.completions.create(**final_request_params)
-                    
-                    response_text = final_response.choices[0].message.content
-                else:
-                    response_text = assistant_message.content
-                
-                # Add to history
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response_text
-                })
-                
-                return response_text
+            # Use Responses API (httpx required)
+            if not HAS_HTTPX:
+                raise RuntimeError("httpx is required for Azure OpenAI. Install with: pip install httpx")
+            return await self._azure_responses_api(messages, tools, stream_callback)
                 
         except Exception as e:
             error_msg = str(e)
@@ -427,7 +511,6 @@ class LLMStream:
                     if isinstance(e.body, dict):
                         error_details = str(e.body)
                     else:
-                        import json
                         error_details = json.loads(e.body) if isinstance(e.body, str) else str(e.body)
                 except:
                     error_details = str(e.body)
@@ -450,62 +533,80 @@ class LLMStream:
             if error_details:
                 print(f"   {error_details}")
             
-            # Show full request URL for debugging
-            if config.USE_AZURE and config.DEBUG:
-                endpoint = config.AZURE_OPENAI_ENDPOINT.rstrip('/')
-                base_url = f"{endpoint}/openai"
-                full_url = f"{base_url}/chat/completions?api-version={config.AZURE_API_VERSION}"
-                print(f"   🔗 Request URL: {full_url}")
+            return "I encountered an error. Please try asking your question again."
+    
+    async def generate_response_streaming(self, user_message: str):
+        """
+        Generate response with sentence-level streaming for faster TTS.
+        
+        Yields sentences as they're ready, allowing TTS to start immediately
+        on the first sentence while LLM continues generating.
+        
+        Yields:
+            tuple: (sentence: str, is_final: bool)
+        """
+        # Add user message to history
+        self.conversation_history.append({
+            "role": "user",
+            "content": user_message
+        })
+        
+        # Keep conversation history manageable
+        if len(self.conversation_history) > config.MAX_CONVERSATION_HISTORY:
+            self.conversation_history = self.conversation_history[-config.MAX_CONVERSATION_HISTORY:]
+        
+        # Prepare messages
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            *self.conversation_history
+        ]
+        
+        # Get tools
+        tools = await self._get_tools()
+        
+        try:
+            if not HAS_HTTPX:
+                raise RuntimeError("httpx is required for Azure OpenAI")
             
-            # Provide helpful troubleshooting info for 404 errors
-            if status_code == 404 or "404" in error_msg or "not found" in error_msg.lower():
-                import os
-                raw_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
-                has_quotes = raw_deployment and (raw_deployment.startswith('"') or raw_deployment.startswith("'") or raw_deployment.endswith('"') or raw_deployment.endswith("'"))
-                
-                print(f"\n   🔍 Troubleshooting 404 error:")
-                print(f"   1. Deployment name: '{self.model}' (verify in Azure Portal)")
-                if has_quotes:
-                    print(f"      ⚠️  WARNING: Original env var had quotes: '{raw_deployment}'")
-                    print(f"      → Make sure Cloud Run env var has NO quotes: gpt-4o-mini (not \"gpt-4o-mini\")")
-                print(f"   2. Deployment type: Must be 'Chat Completions' (NOT Realtime API)")
-                print(f"   3. API version: '{config.AZURE_API_VERSION}'")
-                print(f"      → Try changing to: 2024-10-01-preview")
-                print(f"      → Or try: 2024-02-15-preview")
-                print(f"   4. Endpoint: {config.AZURE_OPENAI_ENDPOINT}")
-                print(f"   5. API key: Verify it has access to this deployment")
-                
-                # Cloud Run specific troubleshooting
-                if os.getenv("K_SERVICE") or os.getenv("CLOUD_RUN_SERVICE"):
-                    print(f"\n   ☁️  Cloud Run Deployment Detected:")
-                    print(f"   6. Verify environment variables are set in Cloud Run (NO QUOTES!):")
-                    print(f"      - USE_AZURE=true")
-                    print(f"      - AZURE_OPENAI_ENDPOINT={config.AZURE_OPENAI_ENDPOINT or 'NOT SET'}")
-                    print(f"      - AZURE_OPENAI_DEPLOYMENT={config.AZURE_OPENAI_DEPLOYMENT or 'NOT SET'}")
-                    print(f"        (Raw value was: '{raw_deployment}')")
-                    print(f"      - AZURE_OPENAI_API_KEY={'SET' if config.AZURE_OPENAI_API_KEY else 'NOT SET'}")
-                    print(f"      - AZURE_API_VERSION={config.AZURE_API_VERSION}")
-                    print(f"   7. Check Cloud Run logs for environment variable values")
-                    print(f"   8. Verify Azure OpenAI allows connections from Cloud Run IPs")
-                    print(f"      (Check Azure Portal → Networking → Firewall rules)")
-                
-                print(f"\n   💡 Quick fix: Update your environment variables:")
-                print(f"      AZURE_API_VERSION=2024-10-01-preview")
-                
-                # If using an invalid API version, suggest trying a known-good one
-                if config.USE_AZURE and config.AZURE_API_VERSION not in ["2024-10-01-preview", "2024-02-15-preview", "2023-12-01-preview", "2023-05-15"]:
-                    print(f"\n   ⚠️  Your API version '{config.AZURE_API_VERSION}' may be invalid!")
-                    print(f"      This is likely the cause of the 404 error.")
+            # Get full response (Azure Responses API doesn't support streaming yet)
+            # But we can split it into sentences for incremental TTS
+            full_response = await self._azure_responses_api(messages, tools, None)
             
-            return "I apologize, I encountered an error processing your request."
+            if not full_response or not isinstance(full_response, str):
+                yield ("I'm sorry, I couldn't generate a response.", True)
+                return
+            
+            # Split response into sentences for streaming TTS
+            # Use regex to split on sentence boundaries while preserving the punctuation
+            import re
+            # Pattern matches sentence endings followed by space or end of string
+            sentence_pattern = r'(?<=[.!?])\s+'
+            sentences = re.split(sentence_pattern, full_response.strip())
+            
+            # Filter out empty sentences
+            sentences = [s.strip() for s in sentences if s.strip()]
+            
+            if not sentences:
+                yield (full_response, True)
+                return
+            
+            # Yield each sentence
+            for i, sentence in enumerate(sentences):
+                is_final = (i == len(sentences) - 1)
+                yield (sentence, is_final)
+                
+                # Small delay between sentences to allow TTS to catch up
+                if not is_final:
+                    await asyncio.sleep(0.05)
+            
+        except Exception as e:
+            logger.error(f"LLM streaming error: {e}")
+            yield ("I encountered an error. Please try again.", True)
     
     async def cleanup(self):
         """Clean up resources"""
-        await self.exit_stack.aclose()
-        
         if config.DEBUG:
             print("🧹 LLM cleaned up")
-
 
 async def test_llm():
     """Test LLM generation"""
@@ -520,7 +621,5 @@ async def test_llm():
     await llm.cleanup()
     print("✓ LLM test complete")
 
-
 if __name__ == "__main__":
     asyncio.run(test_llm())
-

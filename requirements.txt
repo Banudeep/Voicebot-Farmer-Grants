@@ -2,24 +2,26 @@
 
 # Core dependencies
 python-dotenv==1.0.0
+pyyaml>=6.0.0
 
 # Web server and WebSocket support
 aiohttp>=3.9.0
 websockets>=12.0
 
-# HTTP client for Azure OpenAI direct requests
+# HTTP client for Azure OpenAI Responses API
 httpx>=0.25.0
 
-# OpenAI and MCP
+# OpenAI SDK (for embeddings in news_tools.py)
 openai>=1.0.0
-mcp>=0.1.0
-
-# Deepgram for STT and TTS
-deepgram-sdk>=3.0.0
 
 # Azure Speech Services for STT and TTS
 azure-cognitiveservices-speech>=1.40.0
 
-# Async support
-asyncio-mqtt>=0.16.1
+# PDF form filling
+pypdf>=4.0.0
 
+# Retry logic for API calls
+tenacity>=8.0.0
+
+# TTL caching for API responses
+cachetools>=5.0.0

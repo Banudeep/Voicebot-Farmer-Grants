@@ -1,5 +1,6 @@
 /**
  * AudioWorklet processor for low-latency audio capture
+ * Optimized for cascading STT → LLM → TTS pipeline
  *
  * Features:
  * - Runs on a separate thread (not main thread)
@@ -12,41 +13,25 @@ class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
 
-    // Target: 16kHz mono, 20ms frames = 320 samples
+    // Target: 16kHz mono, 20ms frames = 320 samples (optimal for Azure STT)
     this.targetSampleRate = 16000;
     this.frameSize = 320; // 20ms at 16kHz
 
     // Buffer for accumulating samples before sending
     this.sampleBuffer = [];
 
-    // Resampling state
-    this.resamplingBuffer = [];
-
     // Simple low-pass filter state for anti-aliasing
     this.filterState = 0;
 
-    // VAD state
-    this.voiceThreshold = 0.005;
-    this.isSpeaking = false;
-    this.silenceFrameCount = 0;
-    this.maxSilenceFrames = 15; // ~300ms at 20ms frames
-
-    // Listen for messages from main thread
-    this.port.onmessage = (event) => {
-      if (event.data.type === "setVoiceThreshold") {
-        this.voiceThreshold = event.data.value;
-      } else if (event.data.type === "setSilenceFrames") {
-        this.maxSilenceFrames = event.data.value;
-      }
-    };
+    // Send all audio (server handles VAD)
+    this.sendAllAudio = true;
   }
 
   /**
    * Simple low-pass filter for anti-aliasing before downsampling
-   * Cutoff at ~7kHz (Nyquist for 16kHz)
    */
   lowPassFilter(samples, cutoffRatio) {
-    const alpha = cutoffRatio; // Simple RC filter coefficient
+    const alpha = cutoffRatio;
     const filtered = new Float32Array(samples.length);
     let lastValue = this.filterState;
 
@@ -106,7 +91,7 @@ class AudioProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * Calculate RMS energy for voice activity detection
+   * Calculate RMS energy
    */
   calculateRMS(samples) {
     let sum = 0;
@@ -118,9 +103,6 @@ class AudioProcessor extends AudioWorkletProcessor {
 
   /**
    * Process audio - called by the audio system
-   * @param {Float32Array[][]} inputs - Input audio buffers
-   * @param {Float32Array[][]} outputs - Output audio buffers (passthrough)
-   * @param {Object} parameters - Audio parameters
    */
   process(inputs, outputs, parameters) {
     const input = inputs[0];
@@ -151,51 +133,21 @@ class AudioProcessor extends AudioWorkletProcessor {
         frame[i] = this.sampleBuffer.shift();
       }
 
-      // Voice activity detection
+      // Calculate RMS for debugging
       const rms = this.calculateRMS(frame);
-      const hasVoice = rms > this.voiceThreshold;
 
-      // Track speaking state with hysteresis
-      if (hasVoice) {
-        this.silenceFrameCount = 0;
-        if (!this.isSpeaking) {
-          this.isSpeaking = true;
-          this.port.postMessage({ type: "voiceStart" });
-        }
-      } else if (this.isSpeaking) {
-        this.silenceFrameCount++;
-        if (this.silenceFrameCount >= this.maxSilenceFrames) {
-          this.isSpeaking = false;
-          this.port.postMessage({ type: "voiceEnd" });
-        }
-      }
+      // Always send audio (server handles VAD via turn_detection)
+      const pcm16 = this.float32ToInt16(frame);
 
-      // Send audio data if speaking (or in grace period)
-      if (this.isSpeaking || hasVoice) {
-        // Convert to Int16 PCM
-        const pcm16 = this.float32ToInt16(frame);
-
-        // Send to main thread
-        this.port.postMessage(
-          {
-            type: "audioData",
-            audio: pcm16.buffer,
-            rms: rms,
-            hasVoice: hasVoice,
-          },
-          [pcm16.buffer]
-        ); // Transfer buffer for performance
-      }
-
-      // Send RMS for visualization (throttled)
-      if (Math.random() < 0.2) {
-        // ~20% of frames
-        this.port.postMessage({
-          type: "rms",
+      // Send to main thread
+      this.port.postMessage(
+        {
+          type: "audioData",
+          audio: pcm16.buffer,
           rms: rms,
-          hasVoice: hasVoice,
-        });
-      }
+        },
+        [pcm16.buffer]
+      ); // Transfer buffer for performance
     }
 
     return true; // Keep processor alive
