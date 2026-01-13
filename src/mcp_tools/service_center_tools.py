@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 # Paths
-BASE_DIR = Path(__file__).parent.parent
+# Path: src/mcp_tools/service_center_tools.py -> src/mcp_tools -> src -> root
+BASE_DIR = Path(__file__).parent.parent.parent
 CACHE_DIR = BASE_DIR / "cache"
 SERVICE_CENTERS_PATH = CACHE_DIR / "service_centers_complete.json"
 COUNTY_DB_PATH = CACHE_DIR / "us_counties.json"

@@ -61,5 +61,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import socket; s = socket.socket(); s.connect(('localhost', 8080)); s.close()" || exit 1
 
 # Run the application
-CMD ["python", "web_voice_agent.py"]
+# Set PYTHONPATH to include src directory
+ENV PYTHONPATH="${PYTHONPATH}:/app/src"
+
+# Run the application
+CMD ["python", "src/web_voice_agent.py"]
 

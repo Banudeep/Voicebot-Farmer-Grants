@@ -38,7 +38,8 @@ except ImportError:
     OpenAI = None
 
 # Paths
-BASE_DIR = Path(__file__).parent.parent
+# Path: src/mcp_tools/news_tools.py -> src/mcp_tools -> src -> root
+BASE_DIR = Path(__file__).parent.parent.parent
 CACHE_DIR = BASE_DIR / "cache"
 NEWS_DATA_PATH = CACHE_DIR / "state_news_deep.json"
 NEWS_INDEX_PATH = CACHE_DIR / "state_news_index.json"

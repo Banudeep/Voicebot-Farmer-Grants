@@ -1,5 +1,5 @@
 {
-  "cached_at": "2026-01-09T17:33:37.730191",
+  "cached_at": "2026-01-12T19:46:29.721276",
   "reports": [
     {
       "slug_id": "1034",
@@ -590,8 +590,8 @@
       "slug_id": "1236",
       "slug_name": "AMS_1236",
       "report_title": "Unionville Livestock Market LLC Replacement Cattle Special - Unionville, MO",
-      "report_date": "12/06/2025",
-      "published_date": "12/06/2025 13:45:00",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 13:31:00",
       "report_status": "Final",
       "markets": [
         "Unionville Livestock Market LLC"
@@ -628,9 +628,9 @@
       "slug_id": "1245",
       "slug_name": "AMS_1245",
       "report_title": "Joplin Regional Stockyards Feeder Cattle - Carthage, MO",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 19:48:18",
-      "report_status": "Final",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:18:55",
+      "report_status": "Preliminary",
       "markets": [
         "Joplin Regional Stockyards"
       ],
@@ -723,9 +723,9 @@
       "slug_id": "1280",
       "slug_name": "AMS_1280",
       "report_title": "Oklahoma National Stockyards Feeder Cattle - Oklahoma City, OK",
-      "report_date": "01/05/2026",
-      "published_date": "01/06/2026 07:48:06",
-      "report_status": "Final",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:38:17",
+      "report_status": "Preliminary",
       "markets": [
         "Oklahoma National Stockyards Market"
       ],
@@ -913,8 +913,8 @@
       "slug_id": "1427",
       "slug_name": "AMS_1427",
       "report_title": "National Weekly Shell Egg Inventory",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 12:27:30",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:04:27",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -985,8 +985,8 @@
       "slug_id": "1603",
       "slug_name": "AMS_1603",
       "report_title": "CME Group - Daily Cash Trading - Week to Date",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:01:02",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:01:47",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -1040,8 +1040,8 @@
       "slug_id": "1609",
       "slug_name": "AMS_1609",
       "report_title": "Arcadia Livestock Auction - Arcadia, FL (Mon)",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 14:50:25",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 17:21:28",
       "report_status": "Final",
       "markets": [
         "Arcadia Stockyard (Mon)"
@@ -1140,8 +1140,8 @@
       "slug_id": "1625",
       "slug_name": "CNDCQS",
       "report_title": "Daily Cotton Quality Summary by Office",
-      "report_date": "01/08/2026",
-      "published_date": "01/09/2026 06:26:26",
+      "report_date": "01/11/2026",
+      "published_date": "01/12/2026 08:28:46",
       "report_status": "Final",
       "markets": [
         "Memphis (Cotton Classing Office)"
@@ -1413,8 +1413,8 @@
       "slug_id": "1652",
       "slug_name": "CNDCQS_S",
       "report_title": "Daily Cotton Quality Summary by State",
-      "report_date": "01/08/2026",
-      "published_date": "01/09/2026 06:28:20",
+      "report_date": "01/11/2026",
+      "published_date": "01/12/2026 08:30:21",
       "report_status": "Final",
       "markets": [
         "Memphis (Cotton Classing Office)"
@@ -1455,8 +1455,8 @@
       "slug_id": "1655",
       "slug_name": "AMS_1655",
       "report_title": "National Weekly Rice Summary",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 14:13:56",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:34:37",
       "report_status": "Final",
       "markets": [
         "National Weekly Rice Summary"
@@ -1570,8 +1570,8 @@
       "slug_id": "1663",
       "slug_name": "ORNTRDS",
       "report_title": "SC National Ornamental Trends Report",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 16:41:13",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 16:25:52",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -1876,8 +1876,8 @@
       "slug_id": "1778",
       "slug_name": "AMS_1778",
       "report_title": "Montana Weekly Livestock Auction Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 07:37:23",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 08:41:22",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -1963,15 +1963,15 @@
       "offices": [
         "Portales, NM"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
       "slug_id": "1783",
       "slug_name": "AMS_1783",
       "report_title": "Cattlemen's Livestock Auction - Belen, NM",
-      "report_date": "12/19/2025",
-      "published_date": "12/19/2025 19:28:06",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 20:05:48",
       "report_status": "Final",
       "markets": [
         "Cattlemen's Livestock Auction - Belen, NM"
@@ -1989,8 +1989,8 @@
       "slug_id": "1784",
       "slug_name": "AMS_1784",
       "report_title": "New Mexico Weekly Cattle Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 07:35:51",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 07:34:16",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -2047,8 +2047,8 @@
       "slug_id": "1788",
       "slug_name": "AMS_1788",
       "report_title": "Springfield Livestock Marketing Center Slaughter/Replacement Cattle - Springfield, MO",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 13:54:33",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:51:21",
       "report_status": "Final",
       "markets": [
         "Springfield Livestock Marketing Center"
@@ -2465,8 +2465,8 @@
       "slug_id": "1810",
       "slug_name": "AMS_1810",
       "report_title": "Eastern MO Commission Company - Bowling Green, MO",
-      "report_date": "12/19/2025",
-      "published_date": "12/19/2025 16:28:45",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 21:00:49",
       "report_status": "Final",
       "markets": [
         "Eastern Missouri Commission Company"
@@ -2674,8 +2674,8 @@
       "slug_id": "1821",
       "slug_name": "AMS_1821",
       "report_title": "Missouri Weekly Cattle Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 07:32:24",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 07:35:14",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -2901,8 +2901,8 @@
       "slug_id": "1833",
       "slug_name": "AMS_1833",
       "report_title": "Missouri Weekly Sheep/Goat Auction Summary",
-      "report_date": "12/22/2025",
-      "published_date": "12/29/2025 06:51:36",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 06:57:18",
       "report_status": "Final",
       "markets": [
         "Buffalo Livestock Market",
@@ -2984,8 +2984,8 @@
       "slug_id": "1837",
       "slug_name": "AMS_1837",
       "report_title": "Missouri (North Central) Weekly Cattle Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/04/2026 16:02:59",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 06:56:44",
       "report_status": "Final",
       "markets": [
         "Green City Livestock Auction",
@@ -3007,8 +3007,8 @@
       "slug_id": "1838",
       "slug_name": "AMS_1838",
       "report_title": "Missouri (Northeast) Weekly Cattle Auction Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 08:14:53",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 06:54:22",
       "report_status": "Final",
       "markets": [
         "Callaway Livestock Center",
@@ -3214,8 +3214,8 @@
       "slug_id": "1849",
       "slug_name": "AMS_1849",
       "report_title": "Lexington Livestock Market - Lexington, NE",
-      "report_date": "12/19/2025",
-      "published_date": "12/19/2025 13:49:59",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 17:28:48",
       "report_status": "Final",
       "markets": [
         "Lexington"
@@ -3290,8 +3290,8 @@
       "slug_id": "1853",
       "slug_name": "AMS_1853",
       "report_title": "Ericson Livestock Market - Ericson, NE",
-      "report_date": "12/20/2025",
-      "published_date": "12/20/2025 15:57:55",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 15:31:54",
       "report_status": "Final",
       "markets": [
         "Ericson"
@@ -3366,8 +3366,8 @@
       "slug_id": "1857",
       "slug_name": "AMS_1857",
       "report_title": "Crawford Livestock Market - Crawford, NE",
-      "report_date": "12/12/2025",
-      "published_date": "12/12/2025 16:29:06",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 20:02:03",
       "report_status": "Final",
       "markets": [
         "Crawford"
@@ -3423,8 +3423,8 @@
       "slug_id": "1860",
       "slug_name": "AMS_1860",
       "report_title": "Nebraska Weekly Livestock Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 07:40:38",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 09:18:07",
       "report_status": "Final",
       "markets": [
         "Bassett",
@@ -3475,8 +3475,8 @@
       "slug_id": "1863",
       "slug_name": "AMS_1863",
       "report_title": "Centennial Livestock Auction Stock Show Special - Fort Collins, CO",
-      "report_date": "01/06/2025",
-      "published_date": "01/06/2025 15:53:10",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:56:58",
       "report_status": "Final",
       "markets": [
         "Centennial"
@@ -3551,8 +3551,8 @@
       "slug_id": "1867",
       "slug_name": "AMS_1867",
       "report_title": "Sterling Livestock Commission Stock Show Special - Sterling, CO",
-      "report_date": "01/11/2025",
-      "published_date": "01/11/2025 16:57:03",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 20:18:59",
       "report_status": "Final",
       "markets": [
         "Sterling"
@@ -3563,7 +3563,7 @@
       "offices": [
         "Greeley, CO"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -3739,8 +3739,8 @@
       "slug_id": "1878",
       "slug_name": "AMS_1878",
       "report_title": "South Branch Valley Livestock Exchange - Moorefield, WV",
-      "report_date": "12/17/2025",
-      "published_date": "12/17/2025 12:46:00",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 12:06:23",
       "report_status": "Final",
       "markets": [
         "South Branch Valley Livestock Exchange"
@@ -3777,8 +3777,8 @@
       "slug_id": "1880",
       "slug_name": "AMS_1880",
       "report_title": "Jackson County Regional Livestock Market - Ripley, WV",
-      "report_date": "01/03/2026",
-      "published_date": "01/06/2026 11:44:45",
+      "report_date": "01/10/2026",
+      "published_date": "01/12/2026 04:43:04",
       "report_status": "Final",
       "markets": [
         "Jackson County Regional Livestock Market"
@@ -4232,8 +4232,8 @@
       "slug_id": "1906",
       "slug_name": "AMS_1906",
       "report_title": "Livestock Exchange Feeder Cattle Auction (Friday) - Brush, CO",
-      "report_date": "12/12/2025",
-      "published_date": "12/14/2025 22:25:40",
+      "report_date": "01/09/2026",
+      "published_date": "01/10/2026 21:55:05",
       "report_status": "Final",
       "markets": [
         "Brush"
@@ -4251,8 +4251,8 @@
       "slug_id": "1907",
       "slug_name": "AMS_1907",
       "report_title": "Colorado Weekly Cattle Auction Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 09:51:40",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 06:35:22",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -4478,8 +4478,8 @@
       "slug_id": "1919",
       "slug_name": "AMS_1919",
       "report_title": "Pennsylvania Weekly Cattle Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 04:45:22",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 04:14:26",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -4683,8 +4683,8 @@
       "slug_id": "1930",
       "slug_name": "AMS_1930",
       "report_title": "Eastanollee Livestock - Eastanollee, GA",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 23:36:57",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 17:16:01",
       "report_status": "Final",
       "markets": [
         "Eastanollee"
@@ -4733,7 +4733,7 @@
       "offices": [
         "Thomasville, GA"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
@@ -5035,7 +5035,7 @@
       "offices": [
         "Thomasville, GA"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
@@ -5174,8 +5174,8 @@
       "slug_id": "1958",
       "slug_name": "AMS_1958",
       "report_title": "Upstate Livestock Exchange - Williamston, SC",
-      "report_date": "01/05/2026",
-      "published_date": "01/06/2026 08:23:36",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:49:37",
       "report_status": "Final",
       "markets": [
         "Williamston Livestock Auction"
@@ -5186,7 +5186,7 @@
       "offices": [
         "Columbia, SC"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
@@ -5231,8 +5231,8 @@
       "slug_id": "1961",
       "slug_name": "AMS_1961",
       "report_title": "Saluda Stockyards - Saluda, SC",
-      "report_date": "12/15/2025",
-      "published_date": "12/15/2025 13:09:54",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:45:00",
       "report_status": "Final",
       "markets": [
         "Saluda Stockyards"
@@ -5243,7 +5243,7 @@
       "offices": [
         "Columbia, SC"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -5336,7 +5336,7 @@
       "offices": [
         "Indianapolis, IN"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -5514,8 +5514,8 @@
       "slug_id": "1976",
       "slug_name": "AMS_1976",
       "report_title": "Indiana Weekly Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 05:52:05",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 05:39:28",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -5524,7 +5524,7 @@
       "offices": [
         "Indianapolis, IN"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -5588,8 +5588,8 @@
       "slug_id": "1980",
       "slug_name": "AMS_1980",
       "report_title": "Canandaigua Stockyards Feeder and Replacement Cattle Sale - Canandaigua, NY",
-      "report_date": "12/20/2025",
-      "published_date": "12/22/2025 06:52:32",
+      "report_date": "01/10/2026",
+      "published_date": "01/11/2026 15:49:28",
       "report_status": "Final",
       "markets": [
         "Finger Lakes Livestock Auction"
@@ -6171,8 +6171,8 @@
       "slug_id": "2011",
       "slug_name": "AMS_2011",
       "report_title": "New York Weekly Cattle Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 04:44:01",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 04:13:24",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -6322,8 +6322,8 @@
       "slug_id": "2019",
       "slug_name": "AMS_2019",
       "report_title": "St. Onge Livestock Auction - St. Onge, SD",
-      "report_date": "12/05/2025",
-      "published_date": "12/05/2025 15:20:10",
+      "report_date": "01/09/2026",
+      "published_date": "01/12/2026 05:42:34",
       "report_status": "Final",
       "markets": [
         "St. Onge Livestock"
@@ -6334,7 +6334,7 @@
       "offices": [
         "Sioux Falls, SD"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -6360,8 +6360,8 @@
       "slug_id": "2021",
       "slug_name": "AMS_2021",
       "report_title": "Ft. Pierre Livestock Auction (Friday) - Ft. Pierre, SD",
-      "report_date": "12/12/2025",
-      "published_date": "12/12/2025 19:25:37",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 20:23:02",
       "report_status": "Final",
       "markets": [
         "Ft. Pierre Livestock Auction"
@@ -6455,8 +6455,8 @@
       "slug_id": "2026",
       "slug_name": "AMS_2026",
       "report_title": "Sioux Falls Regional Cattle Auction - Worthing, SD",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 15:39:04",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:34:58",
       "report_status": "Final",
       "markets": [
         "Sioux Falls Regional Livestock"
@@ -6474,8 +6474,8 @@
       "slug_id": "2027",
       "slug_name": "AMS_2027",
       "report_title": "South Dakota Weekly Cattle Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 05:34:59",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 05:55:37",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -6681,8 +6681,8 @@
       "slug_id": "2039",
       "slug_name": "AMS_2039",
       "report_title": "Utah Weekly Cattle Auction Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 07:23:58",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 07:26:34",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -6718,8 +6718,8 @@
       "slug_id": "2041",
       "slug_name": "AMS_2041",
       "report_title": "Illinois Weekly Cattle Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 05:53:35",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 05:41:21",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -7002,8 +7002,8 @@
       "slug_id": "2056",
       "slug_name": "AMS_2056",
       "report_title": "Arkansas Weekly Livestock Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 13:14:10",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 07:38:08",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -7058,8 +7058,8 @@
       "slug_id": "2059",
       "slug_name": "AMS_2059",
       "report_title": "Ash Flat Livestock Auction - Ash Flat, AR",
-      "report_date": "01/02/2026",
-      "published_date": "01/02/2026 17:25:17",
+      "report_date": "01/09/2026",
+      "published_date": "01/10/2026 08:31:03",
       "report_status": "Final",
       "markets": [
         "Ash Flat Livestock Auction Inc."
@@ -7096,8 +7096,8 @@
       "slug_id": "2061",
       "slug_name": "AMS_2061",
       "report_title": "Crossville Stockyard - Crossville, TN",
-      "report_date": "01/03/2026",
-      "published_date": "01/03/2026 15:05:27",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 13:23:42",
       "report_status": "Final",
       "markets": [
         "Crossville Livestock Auction"
@@ -7115,8 +7115,8 @@
       "slug_id": "2062",
       "slug_name": "AMS_2062",
       "report_title": "Smith County Commission Co. - Carthage, TN",
-      "report_date": "01/03/2026",
-      "published_date": "01/04/2026 07:56:17",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 17:54:19",
       "report_status": "Final",
       "markets": [
         "Carthage Livestock Auction"
@@ -7134,8 +7134,8 @@
       "slug_id": "2063",
       "slug_name": "AMS_2063",
       "report_title": "Tennessee Weekly Cattle Auction Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 07:42:31",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 09:35:03",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -7151,8 +7151,8 @@
       "slug_id": "2064",
       "slug_name": "AMS_2064",
       "report_title": "Dickson Regional Livestock Center - Dickson, TN",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 19:30:40",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 17:34:05",
       "report_status": "Final",
       "markets": [
         "Dickson Livestock Auction"
@@ -7163,7 +7163,7 @@
       "offices": [
         "Nashville, TN"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -7258,15 +7258,15 @@
       "offices": [
         "Nashville, TN"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
       "slug_id": "2070",
       "slug_name": "AMS_2070",
       "report_title": "Volunteer Stockyards - Greeneville, TN",
-      "report_date": "01/03/2026",
-      "published_date": "01/04/2026 07:36:58",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 19:31:32",
       "report_status": "Final",
       "markets": [
         "Greenville Livestock Auction - Greenville, TN"
@@ -7322,8 +7322,8 @@
       "slug_id": "2073",
       "slug_name": "AMS_2073",
       "report_title": "East Tennessee Livestock Center Graded Feeder Cattle Sale - Sweetwater, TN",
-      "report_date": "11/14/2025",
-      "published_date": "11/14/2025 18:23:33",
+      "report_date": "01/09/2026",
+      "published_date": "01/12/2026 07:00:58",
       "report_status": "Final",
       "markets": [
         "Sweetwater Livestock Auction"
@@ -7334,7 +7334,7 @@
       "offices": [
         "Nashville, TN"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -7436,8 +7436,8 @@
       "slug_id": "2081",
       "slug_name": "AMS_2081",
       "report_title": "Columbia Graded Sheep and Goat Sale - Columbia, TN",
-      "report_date": "12/15/2025",
-      "published_date": "12/15/2025 14:43:08",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:35:59",
       "report_status": "Final",
       "markets": [
         "Columbia Livestock Auction"
@@ -7549,8 +7549,8 @@
       "slug_id": "2087",
       "slug_name": "AMS_2087",
       "report_title": "Carolina Stockyards Livestock Auction (Friday) - Siler City, NC",
-      "report_date": "01/02/2026",
-      "published_date": "01/02/2026 15:28:44",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 21:52:44",
       "report_status": "Final",
       "markets": [
         "Siler City Livestock Auction"
@@ -7561,7 +7561,7 @@
       "offices": [
         "Raleigh, NC"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -7580,7 +7580,7 @@
       "offices": [
         "Raleigh, NC"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
@@ -7625,8 +7625,8 @@
       "slug_id": "2091",
       "slug_name": "AMS_2091",
       "report_title": "North Carolina Weekly Livestock Auction Summary",
-      "report_date": "12/15/2025",
-      "published_date": "01/06/2026 10:04:55",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 06:26:38",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -7636,7 +7636,7 @@
       "offices": [
         "Raleigh, NC"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
@@ -7700,8 +7700,8 @@
       "slug_id": "2095",
       "slug_name": "AMS_2095",
       "report_title": "Carolina Stockyards Livestock Auction (Monday) - Siler City, NC",
-      "report_date": "01/05/2026",
-      "published_date": "01/09/2026 06:04:05",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:04:36",
       "report_status": "Final",
       "markets": [
         "Siler City Livestock Auction"
@@ -7793,8 +7793,8 @@
       "slug_id": "2100",
       "slug_name": "AMS_2100",
       "report_title": "North Dakota Weekly Cattle Auction Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 05:22:16",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 06:02:30",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -7810,8 +7810,8 @@
       "slug_id": "2101",
       "slug_name": "AMS_2101",
       "report_title": "Torrington Livestock Auction - Torrington, WY",
-      "report_date": "12/19/2025",
-      "published_date": "12/19/2025 18:55:58",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 16:26:52",
       "report_status": "Final",
       "markets": [
         "Torrington Livestock Commission Company"
@@ -7905,8 +7905,8 @@
       "slug_id": "2106",
       "slug_name": "AMS_2106",
       "report_title": "Wyoming Weekly Cattle Auction Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 08:16:26",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 08:02:56",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -7952,15 +7952,15 @@
       "offices": [
         "Jackson, MS"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
       "slug_id": "2112",
       "slug_name": "AMS_2112",
       "report_title": "Meridian Stockyard - Meridian, MS",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 19:51:00",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:40:37",
       "report_status": "Final",
       "markets": [
         "Meridian Livestock Auction"
@@ -8145,8 +8145,8 @@
       "slug_id": "2122",
       "slug_name": "AMS_2122",
       "report_title": "Macon Stockyard - Macon, MS",
-      "report_date": "01/05/2026",
-      "published_date": "01/06/2026 10:27:43",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:35:17",
       "report_status": "Final",
       "markets": [
         "Macon Livestock Auction"
@@ -8183,8 +8183,8 @@
       "slug_id": "2124",
       "slug_name": "AMS_2124",
       "report_title": "Grenada Stockyard - Grenada, MS",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 15:55:36",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:52:36",
       "report_status": "Final",
       "markets": [
         "Grenada Livestock Auction"
@@ -8506,8 +8506,8 @@
       "slug_id": "2144",
       "slug_name": "AMS_2144",
       "report_title": "Tama Livestock Feeder Cattle Special - Tama, IA",
-      "report_date": "12/05/2025",
-      "published_date": "12/05/2025 18:57:07",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 17:25:20",
       "report_status": "Final",
       "markets": [
         "Tama Livestock Auction"
@@ -8582,8 +8582,8 @@
       "slug_id": "2148",
       "slug_name": "AMS_2148",
       "report_title": "Virginia Weekly Feeder Cattle Board Sale Summary",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 08:57:38",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 08:39:53",
       "report_status": "Final",
       "markets": [
         "Culpeper Agricultural Enterprise",
@@ -8731,8 +8731,8 @@
       "slug_id": "2155",
       "slug_name": "AMS_2155",
       "report_title": "Dunlap Livestock Feeder Cattle - Dunlap, IA",
-      "report_date": "01/02/2026",
-      "published_date": "01/02/2026 16:24:38",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 15:48:12",
       "report_status": "Final",
       "markets": [
         "Dunlap Livestock Auction"
@@ -8807,8 +8807,8 @@
       "slug_id": "2159",
       "slug_name": "AMS_2159",
       "report_title": "Russell Livestock Feeder Cattle - Russell, IA",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 15:44:30",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 17:30:16",
       "report_status": "Final",
       "markets": [
         "Russell Livestock Auction - Iowa"
@@ -8959,8 +8959,8 @@
       "slug_id": "2167",
       "slug_name": "AMS_2167",
       "report_title": "Iowa Weekly Cattle Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 08:55:23",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 08:41:32",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -8996,8 +8996,8 @@
       "slug_id": "2169",
       "slug_name": "AMS_2169",
       "report_title": "Shenandoah Valley Livestock Graded Feeder Cattle Sale - Harrisonburg, VA",
-      "report_date": "12/20/2025",
-      "published_date": "12/22/2025 08:55:40",
+      "report_date": "01/10/2026",
+      "published_date": "01/12/2026 07:57:35",
       "report_status": "Final",
       "markets": [
         "Shenandoah Valley Livestock"
@@ -9300,8 +9300,8 @@
       "slug_id": "2186",
       "slug_name": "AMS_2186",
       "report_title": "Springlake Graded Feeder Cattle Sale - Moneta, VA",
-      "report_date": "12/20/2025",
-      "published_date": "12/22/2025 08:38:11",
+      "report_date": "01/10/2026",
+      "published_date": "01/12/2026 08:28:34",
       "report_status": "Final",
       "markets": [
         "Springlake Livestock Market, Inc."
@@ -9319,8 +9319,8 @@
       "slug_id": "2187",
       "slug_name": "AMS_2187",
       "report_title": "Virginia Weekly Cattle Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 07:21:36",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 08:38:09",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -9413,8 +9413,8 @@
       "slug_id": "2192",
       "slug_name": "AMS_2192",
       "report_title": "Blue Grass Stockyards (Saturday) - Campbellsville, KY",
-      "report_date": "01/03/2026",
-      "published_date": "01/03/2026 09:59:05",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 14:51:30",
       "report_status": "Final",
       "markets": [
         "Campbellsville Livestock Auction"
@@ -9432,8 +9432,8 @@
       "slug_id": "2193",
       "slug_name": "AMS_2193",
       "report_title": "Kentucky Weekly Livestock Auction Summary",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 06:46:33",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 05:50:32",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -9451,8 +9451,8 @@
       "slug_id": "2194",
       "slug_name": "AMS_2194",
       "report_title": "Lake Cumberland Livestock - Somerset, KY",
-      "report_date": "01/03/2026",
-      "published_date": "01/03/2026 19:56:49",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 17:38:16",
       "report_status": "Final",
       "markets": [
         "Somerset Livestock Auction"
@@ -9699,7 +9699,7 @@
       "slug_name": "AMS_2207",
       "report_title": "United Producers Inc. - Harned, KY",
       "report_date": "01/05/2026",
-      "published_date": "01/05/2026 21:06:04",
+      "published_date": "01/12/2026 05:47:33",
       "report_status": "Final",
       "markets": [
         "Harned Livestock Auction"
@@ -9710,7 +9710,7 @@
       "offices": [
         "Frankfort, KY"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": []
     },
     {
@@ -10290,8 +10290,8 @@
       "slug_id": "2243",
       "slug_name": "AMS_2243",
       "report_title": "Rock Valley Hay Auction (Mon) - Rock Valley, IA",
-      "report_date": "01/05/2026",
-      "published_date": "01/06/2026 08:46:14",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 16:09:45",
       "report_status": "Final",
       "markets": [
         "Rock Valley Hay Auction"
@@ -10397,8 +10397,8 @@
       "slug_id": "2248",
       "slug_name": "AMS_2248",
       "report_title": "West Point Livestock Feeder Cattle - West Point, NE",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 14:24:28",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:41:16",
       "report_status": "Final",
       "markets": [
         "West Point Livestock Auction"
@@ -10648,8 +10648,8 @@
       "slug_id": "2277",
       "slug_name": "AJ_FV010",
       "report_title": "Atlanta Terminal Market Fruit Prices (AJ_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:19:02",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:55:40",
       "report_status": "Final",
       "markets": [
         "Atlanta Terminal Market"
@@ -10670,8 +10670,8 @@
       "slug_id": "2278",
       "slug_name": "AJ_FV020",
       "report_title": "Atlanta Terminal Market Vegetables Prices (AJ_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:56:08",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:56:54",
       "report_status": "Final",
       "markets": [
         "Atlanta Terminal Market"
@@ -10692,8 +10692,8 @@
       "slug_id": "2279",
       "slug_name": "AJ_FV030",
       "report_title": "Atlanta Terminal Market Onions and Potatoes Prices (AJ_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:19:37",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:56:09",
       "report_status": "Final",
       "markets": [
         "Atlanta Terminal Market"
@@ -10714,8 +10714,8 @@
       "slug_id": "2280",
       "slug_name": "AJ_FV040",
       "report_title": "Atlanta Terminal Market Nuts Prices (AJ_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:19:18",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:55:54",
       "report_status": "Final",
       "markets": [
         "Atlanta Terminal Market"
@@ -10736,8 +10736,8 @@
       "slug_id": "2281",
       "slug_name": "BP_FV010",
       "report_title": "Baltimore Terminal Market Fruit Prices (BP_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:53:33",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:58:10",
       "report_status": "Final",
       "markets": [
         "Baltimore Terminal Market"
@@ -10758,8 +10758,8 @@
       "slug_id": "2282",
       "slug_name": "BP_FV020",
       "report_title": "Baltimore Terminal Market Vegetables Prices (BP_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:53:46",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:58:19",
       "report_status": "Final",
       "markets": [
         "Baltimore Terminal Market"
@@ -10780,8 +10780,8 @@
       "slug_id": "2283",
       "slug_name": "BP_FV030",
       "report_title": "Baltimore Terminal Market Onions and Potatoes Prices (BP_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:53:56",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:58:27",
       "report_status": "Final",
       "markets": [
         "Baltimore Terminal Market"
@@ -10802,8 +10802,8 @@
       "slug_id": "2284",
       "slug_name": "BP_FV040",
       "report_title": "Baltimore Terminal Market Nuts Prices (BP_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:54:06",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:58:36",
       "report_status": "Final",
       "markets": [
         "Baltimore Terminal Market"
@@ -10824,8 +10824,8 @@
       "slug_id": "2285",
       "slug_name": "BH_FV010",
       "report_title": "Boston Terminal Market Fruit Prices (BH_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:29:54",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:17:20",
       "report_status": "Final",
       "markets": [
         "Boston Terminal Market"
@@ -10846,8 +10846,8 @@
       "slug_id": "2286",
       "slug_name": "BH_FV020",
       "report_title": "Boston Terminal Market Vegetables Prices (BH_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:30:41",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:08:19",
       "report_status": "Final",
       "markets": [
         "Boston Terminal Market"
@@ -10868,8 +10868,8 @@
       "slug_id": "2287",
       "slug_name": "BH_FV030",
       "report_title": "Boston Terminal Market Onions and Potatoes Prices (BH_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:30:27",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:17:46",
       "report_status": "Final",
       "markets": [
         "Boston Terminal Market"
@@ -10890,8 +10890,8 @@
       "slug_id": "2288",
       "slug_name": "BH_FV040",
       "report_title": "Boston Terminal Market Nuts Prices (BH_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:30:07",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:17:33",
       "report_status": "Final",
       "markets": [
         "Boston Terminal Market"
@@ -10934,8 +10934,8 @@
       "slug_id": "2290",
       "slug_name": "HX_FV010",
       "report_title": "Chicago Terminal Market Fruit Prices (HX_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:00:33",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:00:20",
       "report_status": "Final",
       "markets": [
         "Chicago Terminal Market"
@@ -10956,8 +10956,8 @@
       "slug_id": "2291",
       "slug_name": "HX_FV020",
       "report_title": "Chicago Terminal Market Vegetables Prices (HX_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:01:18",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:20:07",
       "report_status": "Final",
       "markets": [
         "Chicago Terminal Market"
@@ -10978,8 +10978,8 @@
       "slug_id": "2292",
       "slug_name": "HX_FV030",
       "report_title": "Chicago Terminal Market Onions and Potatoes Prices (HX_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:01:01",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:01:40",
       "report_status": "Final",
       "markets": [
         "Chicago Terminal Market"
@@ -11000,8 +11000,8 @@
       "slug_id": "2293",
       "slug_name": "HX_FV040",
       "report_title": "Chicago Terminal Market Nuts Prices (HX_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:00:43",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:01:53",
       "report_status": "Final",
       "markets": [
         "Chicago Terminal Market"
@@ -11022,8 +11022,8 @@
       "slug_id": "2294",
       "slug_name": "CA_FV010",
       "report_title": "Columbia Terminal Market Fruit Prices (CA_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:12:13",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 10:07:45",
       "report_status": "Final",
       "markets": [
         "Columbia Terminal Market"
@@ -11044,8 +11044,8 @@
       "slug_id": "2295",
       "slug_name": "CA_FV020",
       "report_title": "Columbia Terminal Market Vegetables Prices (CA_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:14:36",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 10:08:40",
       "report_status": "Final",
       "markets": [
         "Columbia Terminal Market"
@@ -11066,8 +11066,8 @@
       "slug_id": "2296",
       "slug_name": "CA_FV030",
       "report_title": "Columbia Terminal Market Onions and Potatoes Prices (CA_FV030)",
-      "report_date": "01/08/2026",
-      "published_date": "01/08/2026 09:34:43",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 10:08:54",
       "report_status": "Final",
       "markets": [
         "Columbia Terminal Market"
@@ -11088,8 +11088,8 @@
       "slug_id": "2297",
       "slug_name": "CA_FV040",
       "report_title": "Columbia Terminal Market Nuts Prices (CA_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:18:12",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 10:09:09",
       "report_status": "Final",
       "markets": [
         "Columbia Terminal Market"
@@ -11198,8 +11198,8 @@
       "slug_id": "2302",
       "slug_name": "DU_FV010",
       "report_title": "Detroit Terminal Market Fruit Prices (DU_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:50:24",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 17:06:08",
       "report_status": "Final",
       "markets": [
         "Detroit Terminal Market"
@@ -11220,8 +11220,8 @@
       "slug_id": "2303",
       "slug_name": "DU_FV020",
       "report_title": "Detroit Terminal Market Vegetables Prices (DU_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:51:06",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 17:06:55",
       "report_status": "Final",
       "markets": [
         "Detroit Terminal Market"
@@ -11242,8 +11242,8 @@
       "slug_id": "2304",
       "slug_name": "DU_FV030",
       "report_title": "Detroit Terminal Market Onions and Potatoes Prices (DU_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:50:49",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 17:06:36",
       "report_status": "Final",
       "markets": [
         "Detroit Terminal Market"
@@ -11264,8 +11264,8 @@
       "slug_id": "2305",
       "slug_name": "DU_FV040",
       "report_title": "Detroit Terminal Market Nuts Prices (DU_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:50:36",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 17:06:22",
       "report_status": "Final",
       "markets": [
         "Detroit Terminal Market"
@@ -11286,8 +11286,8 @@
       "slug_id": "2306",
       "slug_name": "HC_FV010",
       "report_title": "Los Angeles Terminal Market Fruit Prices (HC_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:30:16",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:22:05",
       "report_status": "Final",
       "markets": [
         "Los Angeles Terminal Market"
@@ -11308,8 +11308,8 @@
       "slug_id": "2307",
       "slug_name": "HC_FV020",
       "report_title": "Los Angeles Terminal Market Vegetables Prices (HC_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:26:08",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:12:54",
       "report_status": "Final",
       "markets": [
         "Los Angeles Terminal Market"
@@ -11330,8 +11330,8 @@
       "slug_id": "2308",
       "slug_name": "HC_FV030",
       "report_title": "Los Angeles Terminal Market Onions and Potatoes Prices (HC_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:15:19",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:13:09",
       "report_status": "Final",
       "markets": [
         "Los Angeles Terminal Market"
@@ -11352,8 +11352,8 @@
       "slug_id": "2309",
       "slug_name": "HC_FV040",
       "report_title": "Los Angeles Terminal Market Nuts Prices (HC_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:15:34",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:13:24",
       "report_status": "Final",
       "markets": [
         "Los Angeles Terminal Market"
@@ -11374,8 +11374,8 @@
       "slug_id": "2310",
       "slug_name": "MH_FV010",
       "report_title": "Miami Terminal Market Fruit Prices (MH_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:00:49",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:01:18",
       "report_status": "Final",
       "markets": [
         "Miami Terminal Market"
@@ -11396,8 +11396,8 @@
       "slug_id": "2311",
       "slug_name": "MH_FV020",
       "report_title": "Miami Terminal Market Vegetables Prices (MH_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:01:01",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:02:23",
       "report_status": "Final",
       "markets": [
         "Miami Terminal Market"
@@ -11418,8 +11418,8 @@
       "slug_id": "2312",
       "slug_name": "MH_FV030",
       "report_title": "Miami Terminal Market Onions and Potatoes Prices (MH_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:01:12",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:02:03",
       "report_status": "Final",
       "markets": [
         "Miami Terminal Market"
@@ -11440,8 +11440,8 @@
       "slug_id": "2313",
       "slug_name": "MH_FV040",
       "report_title": "Miami Terminal Market Nuts Prices (MH_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:01:22",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:01:42",
       "report_status": "Final",
       "markets": [
         "Miami Terminal Market"
@@ -11462,8 +11462,8 @@
       "slug_id": "2314",
       "slug_name": "NX_FV010",
       "report_title": "New York Terminal Market Fruit Prices (NX_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:51:55",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:00:36",
       "report_status": "Final",
       "markets": [
         "New York Terminal Market"
@@ -11484,8 +11484,8 @@
       "slug_id": "2315",
       "slug_name": "NX_FV020",
       "report_title": "New York Terminal Market Vegetables Prices (NX_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:55:30",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:14:09",
       "report_status": "Final",
       "markets": [
         "New York Terminal Market"
@@ -11506,8 +11506,8 @@
       "slug_id": "2316",
       "slug_name": "NX_FV030",
       "report_title": "New York Terminal Market Onions and Potatoes Prices (NX_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:52:20",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:01:21",
       "report_status": "Final",
       "markets": [
         "New York Terminal Market"
@@ -11528,8 +11528,8 @@
       "slug_id": "2317",
       "slug_name": "NX_FV040",
       "report_title": "New York Terminal Market Nuts Prices (NX_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:52:07",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:00:51",
       "report_status": "Final",
       "markets": [
         "New York Terminal Market"
@@ -11550,8 +11550,8 @@
       "slug_id": "2318",
       "slug_name": "NA_FV010",
       "report_title": "Philadelphia Terminal Market Fruit Prices (NA_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:00:56",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:41:16",
       "report_status": "Final",
       "markets": [
         "Philadelphia Terminal Market"
@@ -11572,8 +11572,8 @@
       "slug_id": "2319",
       "slug_name": "NA_FV020",
       "report_title": "Philadelphia Terminal Market Vegetables Prices (NA_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:03:23",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:33:02",
       "report_status": "Final",
       "markets": [
         "Philadelphia Terminal Market"
@@ -11594,8 +11594,8 @@
       "slug_id": "2320",
       "slug_name": "NA_FV030",
       "report_title": "Philadelphia Terminal Market Onions and Potatoes Prices (NA_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:02:24",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:41:32",
       "report_status": "Final",
       "markets": [
         "Philadelphia Terminal Market"
@@ -11616,8 +11616,8 @@
       "slug_id": "2321",
       "slug_name": "NA_FV040",
       "report_title": "Philadelphia Terminal Market Nuts Prices (NA_FV040)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:01:24",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 09:10:46",
       "report_status": "Final",
       "markets": [
         "Philadelphia Terminal Market"
@@ -12880,8 +12880,8 @@
       "slug_id": "2386",
       "slug_name": "BR_FV110",
       "report_title": "Benton Harbor Shipping Point Fruit Prices (BR_FV110)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:57:26",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:24:20",
       "report_status": "Final",
       "markets": [
         "Benton Harbor FOB SC"
@@ -12924,8 +12924,8 @@
       "slug_id": "2388",
       "slug_name": "BR_FV130",
       "report_title": "Benton Harbor Shipping Point Onions and Potatoes Prices (BR_FV130)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:57:47",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:24:31",
       "report_status": "Final",
       "markets": [
         "Benton Harbor FOB SC"
@@ -12968,8 +12968,8 @@
       "slug_id": "2390",
       "slug_name": "FR_FV110",
       "report_title": "Fresno Shipping Point Fruit Prices (FR_FV110)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:54:45",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:20:06",
       "report_status": "Final",
       "markets": [
         "Fresno (FR) FOB SC"
@@ -12980,7 +12980,7 @@
       "offices": [
         "Fresno, California - SC"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": [
         "Report Header",
         "Report Details"
@@ -12990,8 +12990,8 @@
       "slug_id": "2391",
       "slug_name": "FR_FV120",
       "report_title": "Fresno Shipping Point Vegetables Prices (FR_FV120)",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 13:42:09",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:41:34",
       "report_status": "Final",
       "markets": [
         "Fresno (FE) FOB SC",
@@ -13013,8 +13013,8 @@
       "slug_id": "2392",
       "slug_name": "IF_FV110",
       "report_title": "Idaho Falls Shipping Point Fruit Prices (IF_FV110)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:39:09",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:03:13",
       "report_status": "Final",
       "markets": [
         "Idaho Falls FOB SC"
@@ -13035,8 +13035,8 @@
       "slug_id": "2393",
       "slug_name": "IF_FV130",
       "report_title": "Idaho Falls Shipping Point Onions and Potatoes Prices (IF_FV130)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:29:09",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:08:15",
       "report_status": "Final",
       "markets": [
         "Idaho Falls FOB SC"
@@ -13057,8 +13057,8 @@
       "slug_id": "2394",
       "slug_name": "MB_FV110",
       "report_title": "Inwood Shipping Point Fruit Prices (MB_FV110)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:36:16",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:31:27",
       "report_status": "Final",
       "markets": [
         "Inwood FOB SC"
@@ -13168,8 +13168,8 @@
       "slug_id": "2399",
       "slug_name": "OR_FV110",
       "report_title": "Orlando Shipping Point Fruit Prices (OR_FV110)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:45:23",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:19:15",
       "report_status": "Final",
       "markets": [
         "Orlando (Oviedo) FOB SC"
@@ -13190,8 +13190,8 @@
       "slug_id": "2400",
       "slug_name": "OR_FV120",
       "report_title": "Orlando Shipping Point Vegetables Prices (OR_FV120)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:05:09",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:17:37",
       "report_status": "Final",
       "markets": [
         "Orlando (Oviedo) FOB SC"
@@ -13234,8 +13234,8 @@
       "slug_id": "2402",
       "slug_name": "IX_FV110",
       "report_title": "Phoenix Shipping Point Fruit Prices (IX_FV110)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:39:48",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:49:41",
       "report_status": "Final",
       "markets": [
         "Mcallen FOB SC",
@@ -13258,8 +13258,8 @@
       "slug_id": "2403",
       "slug_name": "IX_FV120",
       "report_title": "Phoenix Shipping Point Vegetables Prices (IX_FV120)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 15:27:04",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 16:51:08",
       "report_status": "Final",
       "markets": [
         "Mcallen FOB SC",
@@ -13304,8 +13304,8 @@
       "slug_id": "2405",
       "slug_name": "RA_FV120",
       "report_title": "Raleigh Shipping Point Vegetables Prices (RA_FV120)",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 12:38:00",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:57:49",
       "report_status": "Final",
       "markets": [
         "Raleigh FOB SC"
@@ -13392,8 +13392,8 @@
       "slug_id": "2410",
       "slug_name": "TV_FV120",
       "report_title": "Thomasville Shipping Point Vegetables Prices (TV_FV120)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:11:32",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:15:04",
       "report_status": "Final",
       "markets": [
         "Thomasville (TV) FOB SC"
@@ -13414,8 +13414,8 @@
       "slug_id": "2411",
       "slug_name": "TH_FV120",
       "report_title": "Thomasville Shipping Point Vegetables Prices (TH_FV120)",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 12:30:22",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 16:17:24",
       "report_status": "Final",
       "markets": [
         "Thomasville (TH) FOB SC"
@@ -13436,8 +13436,8 @@
       "slug_id": "2412",
       "slug_name": "YA_FV110",
       "report_title": "YAKIMA Shipping Point Fruit Prices (YA_FV110)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:52:17",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:36:12",
       "report_status": "Final",
       "markets": [
         "Yakima FOB SC"
@@ -13610,8 +13610,8 @@
       "slug_id": "2711",
       "slug_name": "AMS_2711",
       "report_title": "Texas Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:55:23",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:28:33",
       "report_status": "Final",
       "markets": [
         "Grain - Texas"
@@ -13697,8 +13697,8 @@
       "slug_id": "2717",
       "slug_name": "TV_FV170",
       "report_title": "THOMASVILLE, GA TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:10:02",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:16:38",
       "report_status": "Final",
       "markets": [
         "Thomasville (TH) FOB SC",
@@ -13853,8 +13853,8 @@
       "slug_id": "2734",
       "slug_name": "AMS_2734",
       "report_title": "Daily New York Shell Egg",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:18:15",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 10:35:39",
       "report_status": "Final",
       "markets": [
         "New York Eggs"
@@ -13924,8 +13924,8 @@
       "slug_id": "2762",
       "slug_name": "MB_FV170",
       "report_title": "INWOOD, WV TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/06/2026",
-      "published_date": "01/06/2026 13:23:14",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:33:57",
       "report_status": "Final",
       "markets": [
         "Inwood FOB SC"
@@ -14012,8 +14012,8 @@
       "slug_id": "2768",
       "slug_name": "BR_FV170",
       "report_title": "BENTON HARBOR, MI TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:54:22",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:24:46",
       "report_status": "Final",
       "markets": [
         "Benton Harbor FOB SC"
@@ -14080,8 +14080,8 @@
       "slug_id": "2771",
       "slug_name": "AMS_2771",
       "report_title": "Montana Daily Elevator Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:46:33",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:02:28",
       "report_status": "Final",
       "markets": [
         "Grain - Montana"
@@ -14092,7 +14092,7 @@
       "offices": [
         "Greeley, CO"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": [
         "Report Header",
         "Report Detail"
@@ -14341,8 +14341,8 @@
       "slug_id": "2787",
       "slug_name": "AMS_2787",
       "report_title": "South Carolina Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:01:17",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:05:09",
       "report_status": "Final",
       "markets": [
         "Grain - South Carolina"
@@ -14655,8 +14655,8 @@
       "slug_id": "2829",
       "slug_name": "AMS_2829",
       "report_title": "By-Product Drop Value (Steers) (Cattle) (NW_LS441 / 447)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:17:31",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:17:19",
       "report_status": "Final",
       "markets": [
         "By-Products"
@@ -14678,8 +14678,8 @@
       "slug_id": "2830",
       "slug_name": "AMS_2830",
       "report_title": "Major Packer Hide Report (NW_LS448)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:16:15",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:17:02",
       "report_status": "Final",
       "markets": [
         "By-Products"
@@ -14700,8 +14700,8 @@
       "slug_id": "2833",
       "slug_name": "AMS_2833",
       "report_title": "USDA Beef & Pork Variety Meats Report (NW_LS440)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:15:37",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:16:47",
       "report_status": "Final",
       "markets": [
         "By-Products"
@@ -14768,8 +14768,8 @@
       "slug_id": "2837",
       "slug_name": "AMS_2837",
       "report_title": "USDA Tallow & Protein Report (NW_LS442)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:15:55",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:16:54",
       "report_status": "Final",
       "markets": [
         "By-Products"
@@ -14790,8 +14790,8 @@
       "slug_id": "2838",
       "slug_name": "AMS_2838",
       "report_title": "Weekly Pork & Beef Variety Meat Report (NW_LS905)",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 08:03:27",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 08:01:34",
       "report_status": "Final",
       "markets": [
         "By-Products"
@@ -14812,8 +14812,8 @@
       "slug_id": "2839",
       "slug_name": "AMS_2839",
       "report_title": "Weekly Tallow & Protein Report (NW_LS906)",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 08:03:51",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 08:01:49",
       "report_status": "Final",
       "markets": [
         "By-Products"
@@ -14859,8 +14859,8 @@
       "slug_id": "2843",
       "slug_name": "AMS_2843",
       "report_title": "Daily National Shell Egg Index Report (5-day rolling average)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 08:19:55",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 07:31:49",
       "report_status": "Final",
       "markets": [
         "National 5 Day Weighted Index"
@@ -14934,8 +14934,8 @@
       "slug_id": "2850",
       "slug_name": "AMS_2850",
       "report_title": "Iowa Daily Cash Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:17:21",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:54:05",
       "report_status": "Final",
       "markets": [
         "Grain - Iowa"
@@ -14956,8 +14956,8 @@
       "slug_id": "2851",
       "slug_name": "AMS_2851",
       "report_title": "Ohio Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:07:20",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:35:10",
       "report_status": "Final",
       "markets": [
         "Grain - Ohio"
@@ -15135,8 +15135,8 @@
       "slug_id": "2886",
       "slug_name": "AMS_2886",
       "report_title": "Kansas Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:25:49",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:47:19",
       "report_status": "Final",
       "markets": [
         "Grain - Kansas"
@@ -15157,8 +15157,8 @@
       "slug_id": "2887",
       "slug_name": "AMS_2887",
       "report_title": "National Daily Sunflower, Canola, Millet, and Flaxseed Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:05:17",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:51:05",
       "report_status": "Final",
       "markets": [
         "Grain - National Sunflower"
@@ -15202,8 +15202,8 @@
       "slug_id": "2892",
       "slug_name": "AMS_2892",
       "report_title": "Kentucky Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:10:20",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:35:36",
       "report_status": "Final",
       "markets": [
         "Grain - Kentucky"
@@ -15316,8 +15316,8 @@
       "slug_id": "2899",
       "slug_name": "FR_FV170",
       "report_title": "FRESNO, CA TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:52:39",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:07:06",
       "report_status": "Final",
       "markets": [
         "Fresno (FR) FOB SC"
@@ -15328,7 +15328,7 @@
       "offices": [
         "Fresno, California - SC"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": [
         "Report Header",
         "Report Details"
@@ -15455,8 +15455,8 @@
       "slug_id": "2912",
       "slug_name": "AMS_2912",
       "report_title": "Colorado Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:11:09",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:34:03",
       "report_status": "Final",
       "markets": [
         "Grain - Colorado"
@@ -15477,8 +15477,8 @@
       "slug_id": "2914",
       "slug_name": "AMS_2914",
       "report_title": "Weekly Bean, Pea, and Lentil Market Review",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 12:58:49",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:39:43",
       "report_status": "Final",
       "markets": [
         "Grain - Weekly Bean/Peas/Lentils"
@@ -15499,8 +15499,8 @@
       "slug_id": "2917",
       "slug_name": "AMS_2917",
       "report_title": "Dry Edible Beans Daily Grower Bids (ND/MN and NE-CO/WY/W-NE)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 06:18:54",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 06:12:39",
       "report_status": "Final",
       "markets": [
         "Grain - Daily Bean Bids"
@@ -15566,8 +15566,8 @@
       "slug_id": "2925",
       "slug_name": "IF_FV170",
       "report_title": "IDAHO FALLS, ID TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:31:47",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:52:56",
       "report_status": "Final",
       "markets": [
         "Idaho Falls FOB SC"
@@ -15588,8 +15588,8 @@
       "slug_id": "2928",
       "slug_name": "AMS_2928",
       "report_title": "Mississippi Daily Grain Bids",
-      "report_date": "01/08/2026",
-      "published_date": "01/09/2026 04:51:52",
+      "report_date": "01/09/2026",
+      "published_date": "01/12/2026 04:44:10",
       "report_status": "Final",
       "markets": [
         "Grain - Mississippi"
@@ -15656,8 +15656,8 @@
       "slug_id": "2932",
       "slug_name": "AMS_2932",
       "report_title": "Missouri Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:02:36",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:03:07",
       "report_status": "Final",
       "markets": [
         "Grain - Missouri"
@@ -15816,8 +15816,8 @@
       "slug_id": "2960",
       "slug_name": "AMS_2960",
       "report_title": "Arkansas Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:33:36",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:30:18",
       "report_status": "Final",
       "markets": [
         "Grain - Arkansas"
@@ -15926,8 +15926,8 @@
       "slug_id": "3031",
       "slug_name": "MH_FV170",
       "report_title": "MIAMI, FL TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:39:11",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 10:00:48",
       "report_status": "Final",
       "markets": [
         "Miami FOB SC"
@@ -15948,8 +15948,8 @@
       "slug_id": "3034",
       "slug_name": "MH_FV221",
       "report_title": "Import Ornamental Shipping Point Report - Miami, FL (MH_FV221)",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 16:39:07",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 16:21:25",
       "report_status": "Final",
       "markets": [
         "Miami FOB Ornamentals"
@@ -16036,8 +16036,8 @@
       "slug_id": "3043",
       "slug_name": "AMS_3043",
       "report_title": "Iowa-Southern Minnesota Barge Terminal Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:01:34",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:34:52",
       "report_status": "Final",
       "markets": [
         "Grain - IA-MN Barge"
@@ -16058,8 +16058,8 @@
       "slug_id": "3046",
       "slug_name": "AMS_3046",
       "report_title": "Minneapolis Daily Grain Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:45:35",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:49:11",
       "report_status": "Final",
       "markets": [
         "GR - MGEX"
@@ -16080,8 +16080,8 @@
       "slug_id": "3049",
       "slug_name": "AMS_3049",
       "report_title": "Southern Minnesota Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:53:19",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:52:58",
       "report_status": "Final",
       "markets": [
         "Grain - Southern MN Elevators"
@@ -16240,8 +16240,8 @@
       "slug_id": "3088",
       "slug_name": "AMS_3088",
       "report_title": "Tennessee Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:59:47",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:23:33",
       "report_status": "Final",
       "markets": [
         "Grain - Tennessee"
@@ -16461,8 +16461,8 @@
       "slug_id": "3100",
       "slug_name": "AMS_3100",
       "report_title": "Oklahoma Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:36:21",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 14:12:36",
       "report_status": "Final",
       "markets": [
         "Grain - Oklahoma"
@@ -16553,8 +16553,8 @@
       "slug_id": "3105",
       "slug_name": "OR_FV170",
       "report_title": "ORLANDO, FL TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:08:19",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:20:22",
       "report_status": "Final",
       "markets": [
         "Orlando (Oviedo) FOB SC"
@@ -16663,8 +16663,8 @@
       "slug_id": "3119",
       "slug_name": "EL_FV170",
       "report_title": "EL CENTRO, CA TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:52:47",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:05:20",
       "report_status": "Final",
       "markets": [
         "El Centro FOB SC"
@@ -16707,8 +16707,8 @@
       "slug_id": "3123",
       "slug_name": "MC_FV170",
       "report_title": "MCALLEN, TX TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:16:25",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 10:48:13",
       "report_status": "Final",
       "markets": [
         "Mcallen FOB SC"
@@ -16773,8 +16773,8 @@
       "slug_id": "3127",
       "slug_name": "IX_FV170",
       "report_title": "PHOENIX, AZ TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:10:09",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:01:49",
       "report_status": "Final",
       "markets": [
         "Phoenix FOB SC"
@@ -16903,8 +16903,8 @@
       "slug_id": "3147",
       "slug_name": "AMS_3147",
       "report_title": "Louisiana and Texas Export Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:55:14",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:04:10",
       "report_status": "Final",
       "markets": [
         "Grain - Gulf Export"
@@ -16925,8 +16925,8 @@
       "slug_id": "3148",
       "slug_name": "AMS_3148",
       "report_title": "Portland Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:56:40",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:04:35",
       "report_status": "Final",
       "markets": [
         "Grain - Portland Grain"
@@ -16937,7 +16937,7 @@
       "offices": [
         "Portland, OR"
       ],
-      "hasCorrectionsInLastThreeDays": false,
+      "hasCorrectionsInLastThreeDays": true,
       "sectionNames": [
         "Report Header",
         "Report Detail"
@@ -16947,8 +16947,8 @@
       "slug_id": "3156",
       "slug_name": "AMS_3156",
       "report_title": "North Carolina Cash Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:17:48",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 15:32:46",
       "report_status": "Final",
       "markets": [
         "Grain - North Carolina"
@@ -17037,8 +17037,8 @@
       "slug_id": "3165",
       "slug_name": "RA_FV170",
       "report_title": "RALEIGH, NC TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 12:37:15",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:44:24",
       "report_status": "Final",
       "markets": [
         "Raleigh FOB SC"
@@ -17059,8 +17059,8 @@
       "slug_id": "3167",
       "slug_name": "AMS_3167",
       "report_title": "Virginia Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:10:24",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:34:34",
       "report_status": "Final",
       "markets": [
         "Grain - Virginia"
@@ -17259,8 +17259,8 @@
       "slug_id": "3186",
       "slug_name": "AMS_3186",
       "report_title": "South Dakota Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:10:02",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:33:05",
       "report_status": "Final",
       "markets": [
         "Grain - South Dakota"
@@ -17281,8 +17281,8 @@
       "slug_id": "3192",
       "slug_name": "AMS_3192",
       "report_title": "Illinois Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:59:34",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:14:46",
       "report_status": "Final",
       "markets": [
         "Grain - Illinois"
@@ -17325,8 +17325,8 @@
       "slug_id": "3208",
       "slug_name": "AMS_3208",
       "report_title": "Daily Livestock and Poultry Slaughter",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:58:17",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:04:43",
       "report_status": "Final",
       "markets": [
         "FIS Slaughter (Estimated)"
@@ -17396,8 +17396,8 @@
       "slug_id": "3223",
       "slug_name": "AMS_3223",
       "report_title": "Kansas City Board of Trade Daily Wheat Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:46:07",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:57:37",
       "report_status": "Final",
       "markets": [
         "Grain - Kansas City Wheat "
@@ -17418,8 +17418,8 @@
       "slug_id": "3225",
       "slug_name": "AMS_3225",
       "report_title": "Nebraska Daily Elevator Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:04:01",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:30:15",
       "report_status": "Final",
       "markets": [
         "Grain - Nebraska"
@@ -17532,8 +17532,8 @@
       "slug_id": "3239",
       "slug_name": "AMS_3239",
       "report_title": "Wyoming Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:11:29",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:34:15",
       "report_status": "Final",
       "markets": [
         "Grain - Wyoming"
@@ -17600,8 +17600,8 @@
       "slug_id": "3243",
       "slug_name": "WA_FV280",
       "report_title": "WASHINGTON DC ORNAMENTAL Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:03:21",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:03:05",
       "report_status": "Final",
       "markets": [
         "Washington DC FOB SC"
@@ -17644,8 +17644,8 @@
       "slug_id": "3283",
       "slug_name": "WA_FV170",
       "report_title": "WASHINGTON, DC TRUCK, AIR AND BOAT Daily Movement Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 11:24:58",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 11:52:31",
       "report_status": "Final",
       "markets": [
         "Washington DC FOB SC"
@@ -17666,8 +17666,8 @@
       "slug_id": "3324",
       "slug_name": "FVWRETAIL",
       "report_title": "National Retail Report - Specialty Crops (FVWRETAIL)",
-      "report_date": "01/02/2026",
-      "published_date": "01/02/2026 16:08:45",
+      "report_date": "01/09/2026",
+      "published_date": "01/09/2026 16:36:15",
       "report_status": "Final",
       "markets": [
         "Alaska Retail - SC"
@@ -17689,8 +17689,8 @@
       "slug_id": "3332",
       "slug_name": "YA_FV170",
       "report_title": "YAKIMA, WA TRUCK AIR, AND BOAT Daily Movement Report",
-      "report_date": "01/07/2026",
-      "published_date": "01/07/2026 13:15:16",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 09:08:19",
       "report_status": "Final",
       "markets": [
         "Yakima FOB SC"
@@ -18268,8 +18268,8 @@
       "slug_id": "3463",
       "slug_name": "AMS_3463",
       "report_title": "Indiana Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 13:12:13",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:36:05",
       "report_status": "Final",
       "markets": [
         "Grain - Indiana"
@@ -18523,7 +18523,7 @@
       "offices": [
         "Jefferson City, MO"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
@@ -18851,8 +18851,8 @@
       "slug_id": "3617",
       "slug_name": "AMS_3617",
       "report_title": "National Daily Ethanol Report",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 07:00:22",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 06:59:30",
       "report_status": "Final",
       "markets": [
         "Ag Energy (Grain)"
@@ -18873,8 +18873,8 @@
       "slug_id": "3618",
       "slug_name": "AMS_3618",
       "report_title": "National Weekly Grain Co-Products Report",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 06:36:19",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 06:58:53",
       "report_status": "Final",
       "markets": [],
       "market_types": [
@@ -19226,15 +19226,15 @@
       "offices": [
         "Jefferson City, MO"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
       "slug_id": "3641",
       "slug_name": "AMS_3641",
       "report_title": "Weekly Major Packer Hide Report",
-      "report_date": "12/29/2025",
-      "published_date": "01/05/2026 08:04:01",
+      "report_date": "01/05/2026",
+      "published_date": "01/12/2026 08:02:27",
       "report_status": "Final",
       "markets": [
         "By-Products"
@@ -19406,8 +19406,8 @@
       "slug_id": "3652",
       "slug_name": "AMS_3652",
       "report_title": "Arthur Sale Barn Hay Auction - Arthur, IL (Monday)",
-      "report_date": "01/05/2026",
-      "published_date": "01/05/2026 14:08:26",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:54:14",
       "report_status": "Final",
       "markets": [
         "Arthur Sale Barn"
@@ -19557,8 +19557,8 @@
       "slug_id": "3660",
       "slug_name": "AMS_3660",
       "report_title": "Madison County Ag Auction",
-      "report_date": "01/03/2026",
-      "published_date": "01/05/2026 07:51:50",
+      "report_date": "01/10/2026",
+      "published_date": "01/11/2026 10:38:08",
       "report_status": "Final",
       "markets": [
         "Madison County Ag Auction"
@@ -19776,8 +19776,8 @@
       "slug_id": "3672",
       "slug_name": "AMS_3672",
       "report_title": "Beebe Livestock Auction- Sheep and Goat Sale",
-      "report_date": "11/08/2025",
-      "published_date": "11/08/2025 14:25:36",
+      "report_date": "01/10/2026",
+      "published_date": "01/10/2026 16:29:32",
       "report_status": "Final",
       "markets": [
         "Beebe Livestock Auction"
@@ -19838,8 +19838,8 @@
       "slug_id": "3675",
       "slug_name": "AMS_3675",
       "report_title": "Warren Co. Livestock Auction - McMinnville, TN",
-      "report_date": "12/15/2025",
-      "published_date": "12/22/2025 07:37:52",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:37:15",
       "report_status": "Final",
       "markets": [
         "McMinnville Livestock Auction"
@@ -20384,7 +20384,7 @@
       "offices": [
         "Raleigh, NC"
       ],
-      "hasCorrectionsInLastThreeDays": true,
+      "hasCorrectionsInLastThreeDays": false,
       "sectionNames": []
     },
     {
@@ -20683,8 +20683,8 @@
       "slug_id": "3804",
       "slug_name": "AMS_3804",
       "report_title": "Daily Spot Cotton Quotations",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 12:48:21",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:09:09",
       "report_status": "Final",
       "markets": [
         "Cotton Prices"
@@ -20791,8 +20791,8 @@
       "slug_id": "3878",
       "slug_name": "AMS_3878",
       "report_title": "North Dakota Daily Grain Bids",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 14:21:23",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 13:59:05",
       "report_status": "Final",
       "markets": [
         "Grain - North Dakota"
@@ -20900,8 +20900,8 @@
       "slug_id": "3888",
       "slug_name": "AMS_3888",
       "report_title": "Daily National Breaking Stock",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 10:19:16",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 09:46:34",
       "report_status": "Final",
       "markets": [
         "National Breaking Stock"
@@ -21226,8 +21226,8 @@
       "slug_id": "3913",
       "slug_name": "AS_FV010",
       "report_title": "Asheville, NC Terminal Market Fruit Prices (AS_FV010)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:52:52",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:41:46",
       "report_status": "Final",
       "markets": [
         "Asheville Terminal Market"
@@ -21248,8 +21248,8 @@
       "slug_id": "3914",
       "slug_name": "AS_FV020",
       "report_title": "Asheville, NC Terminal Market Vegetables Prices (AS_FV020)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:53:17",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:42:15",
       "report_status": "Final",
       "markets": [
         "Asheville Terminal Market"
@@ -21270,8 +21270,8 @@
       "slug_id": "3915",
       "slug_name": "AS_FV030",
       "report_title": "Asheville, NC Terminal Market Onions and Potatoes Prices (AS_FV030)",
-      "report_date": "01/09/2026",
-      "published_date": "01/09/2026 09:53:05",
+      "report_date": "01/12/2026",
+      "published_date": "01/12/2026 12:42:02",
       "report_status": "Final",
       "markets": [
         "Asheville Terminal Market"

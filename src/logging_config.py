@@ -35,7 +35,9 @@ LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # Log file path (optional)
-LOG_DIR = Path(__file__).parent / "logs"
+# Path: src/logging_config.py -> src -> root
+BASE_DIR = Path(__file__).parent.parent
+LOG_DIR = BASE_DIR / "logs"
 LOG_FILE = os.getenv("LOG_FILE", "")  # Set to enable file logging
 
 

@@ -24,7 +24,8 @@ except ImportError:
     HAS_PYPDF = False
 
 # Base directory for documents
-DOCUMENT_DIR = Path(__file__).parent.parent / "Document"
+# Path: src/mcp_tools/form_tools.py -> src/mcp_tools -> src -> root
+DOCUMENT_DIR = Path(__file__).parent.parent.parent / "Document"
 
 # In-memory storage for form data
 # Structure: { form_name: { field_id: value } }
@@ -45,8 +46,14 @@ def _get_form_schema(form_name: str) -> Dict[str, Any]:
         return {"error": "pypdf not installed"}
     
     pdf_path = DOCUMENT_DIR / form_name
+    pdf_path = DOCUMENT_DIR / form_name
     if not pdf_path.exists():
-        return {"error": f"Form {form_name} not found"}
+        # Help the LLM self-correct by listing actual available forms
+        available = [f.name for f in DOCUMENT_DIR.glob("*.pdf")]
+        return {
+            "error": f"Form '{form_name}' not found. Available forms: {', '.join(available)}",
+            "available_forms": available
+        }
 
     try:
         reader = PdfReader(str(pdf_path))
@@ -326,7 +333,7 @@ GET_FORM_FIELDS_TOOL = {
             "properties": {
                 "form_name": {
                     "type": "string",
-                    "description": "Name of the form file (e.g. AD-1069.pdf)"
+                    "description": "Exact name of the form file (e.g. 'AD-1069.pdf'). MUST be one of the files returned by list_available_forms(). Do NOT invent form names like 'prices'."
                 }
             },
             "required": ["form_name"]

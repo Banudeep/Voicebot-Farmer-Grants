@@ -32,6 +32,10 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SMTP_FROM=${SMTP_FROM}
+
+      # USDA Data APIs
+      - USDA_API_KEY=${USDA_API_KEY}
+      - NASS_API_KEY=${NASS_API_KEY}
     volumes:
       # Persist recordings outside container
       - ./recordings:/app/recordings

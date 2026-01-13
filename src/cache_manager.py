@@ -14,6 +14,7 @@ import json
 from functools import wraps
 from typing import Any, Callable, Optional
 import time
+from pathlib import Path
 
 # Try to import cachetools, fallback to simple dict cache
 try:
@@ -26,6 +27,9 @@ from logging_config import get_logger
 
 logger = get_logger("voicebot.cache")
 
+# Path: src/cache_manager.py -> src -> root
+BASE_DIR = Path(__file__).parent.parent
+CACHE_DIR = BASE_DIR / "cache"
 # Cache configuration (in seconds)
 CACHE_TTL = {
     "nass_api": 3600,       # 1 hour - NASS data changes daily at most

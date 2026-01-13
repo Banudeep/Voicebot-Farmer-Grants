@@ -32,7 +32,8 @@ except ImportError:
         return decorator
 
 # Data paths
-CACHE_DIR = Path(__file__).parent.parent / "cache"
+# Path: src/mcp_tools/unified_programs_tools.py -> src/mcp_tools -> src -> root
+CACHE_DIR = Path(__file__).parent.parent.parent / "cache"
 FSA_DATA_PATH = CACHE_DIR / "fsa_programs_comprehensive.json"
 RD_DATA_PATH = CACHE_DIR / "rd_programs_comprehensive.json"
 DEADLINES_DATA_PATH = CACHE_DIR / "program_deadlines_comprehensive.json"

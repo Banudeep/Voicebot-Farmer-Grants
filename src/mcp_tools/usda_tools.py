@@ -16,10 +16,14 @@ import httpx
 
 # USDA API Configuration
 USDA_BASE_URL = "https://marsapi.ams.usda.gov/services/v1.2"
-USDA_API_KEY = os.getenv("USDA_API_KEY")
+# Sanitize API key to remove potential whitespace or newlines from .env copy-paste
+_RAW_KEY = os.getenv("USDA_API_KEY", "")
+# Remove quotes and then remove all whitespace
+USDA_API_KEY = "".join(_RAW_KEY.strip("'\"").split()) if _RAW_KEY else None
 
 # Cache configuration
-CACHE_DIR = Path(__file__).parent.parent / "cache"
+# Path: src/mcp_tools/usda_tools.py -> src/mcp_tools -> src -> root
+CACHE_DIR = Path(__file__).parent.parent.parent / "cache"
 CACHE_DIR.mkdir(exist_ok=True)
 REPORTS_CACHE_FILE = CACHE_DIR / "usda_reports_cache.json"
 CACHE_EXPIRY_HOURS = 24  # Refresh cache every 24 hours
@@ -27,10 +31,13 @@ CACHE_EXPIRY_HOURS = 24  # Refresh cache every 24 hours
 
 def get_auth_headers():
     """Get authentication headers if API key is available"""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
     if USDA_API_KEY:
         credentials = base64.b64encode(f"{USDA_API_KEY}:".encode()).decode()
-        return {"Authorization": f"Basic {credentials}"}
-    return {}
+        headers["Authorization"] = f"Basic {credentials}"
+    return headers
 
 
 async def fetch_api_endpoint(endpoint: str) -> dict:
@@ -44,15 +51,26 @@ async def fetch_api_endpoint(endpoint: str) -> dict:
     print("=" * 80)
     print(f"Method: GET")
     print(f"URL: {url}")
-    if headers:
-        # Don't print full auth header, just indicate it's present
-        print(f"Headers: Authorization: [REDACTED]")
-    print(f"Full URL: {url}")
+    if "Authorization" in headers:
+        print(f"Headers: Authorization: [REDACTED], User-Agent: {headers.get('User-Agent')}")
+    else:
+        print(f"Headers: No Authorization (Key missing)")
     print("=" * 80 + "\n")
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             response = await client.get(url, headers=headers)
+            
+            # Catch Auth errors immediately
+            if response.status_code in (401, 403):
+                print(f"❌ API Authentication Failed: HTTP {response.status_code}")
+                return {
+                    "success": False,
+                    "url": url,
+                    "error": "Authentication failed (HTTP 401/403). Check USDA_API_KEY.",
+                    "code": response.status_code
+                }
+            
             response.raise_for_status()
             
             try:
@@ -197,6 +215,8 @@ async def check_date_for_data(endpoint: str, headers: dict, date_str: str, commo
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 400:
                 return (False, None, f"Bad request for {date_str} (data likely not available)")
+            elif e.response.status_code in (401, 403):
+                return (False, None, f"AUTH_ERROR_HTTP_{e.response.status_code}")
             else:
                 return (False, None, f"HTTP {e.response.status_code} for {date_str}")
         except Exception as e:
@@ -275,6 +295,28 @@ async def get_corn_soybean_prices(slug_id: int = 3167, date: Optional[str] = Non
     print(f"🔍 Phase 1: Checking last 7 days concurrently starting from {format_date_for_api(start_date)}")
     date_requested_str = date if date else "today"
     result = await check_date_range_concurrently(endpoint, headers, slug_id, start_date, 8, commodity, "week", date_requested_str)
+    
+    # Check for Auth Error in result logic (Wait, check_date_range_concurrently returns found result OR None)
+    # We need to peek at 'check_date_for_data' results, but check_date_range_concurrently hides them if None.
+    # But wait! If result is found, we return it. If NOT found, we continue.
+    # If Auth failed for ALL dates, we iterate to Phase 2. This is bad.
+    
+    # To fix this properly without refactoring everything: 
+    # check_date_range_concurrently ONLY returns success.
+    # Let's do a quick single-day check first to validate Auth!
+    
+    # Quick Auth Check with today's date (or start_date)
+    print("🔑 Verifying API Authentication...")
+    auth_check_date = format_date_for_api(start_date)
+    has_access, _, auth_err = await check_date_for_data(endpoint, headers, auth_check_date, commodity)
+    if not has_access and auth_err and "AUTH_ERROR" in auth_err:
+        return {
+            "success": False,
+            "slug_id": slug_id,
+            "error": f"USDA API Authentication Failed: {auth_err}. Please check your USDA_API_KEY in .env.",
+            "note": "Stopping search immediately due to invalid credentials."
+        }
+
     if result:
         return result
     

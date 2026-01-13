@@ -713,6 +713,47 @@
         opacity: 1;
       }
 
+      .content-row {
+        display: flex;
+        align-items: center; /* Align center */
+        gap: 6px;
+        max-width: 100%;
+      }
+      
+      .standalone-listen-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-tertiary);
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        min-width: 32px; /* Prevent squishing */
+        border-radius: 50%;
+        display: none; /* Hidden by default until audio ready */
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        flex: none; /* Override global 'flex: 1' on buttons */
+        margin-left: 4px;
+      }
+      
+      .standalone-listen-btn:hover {
+        color: var(--text-primary);
+        background: var(--bg-tertiary);
+      }
+      
+      .standalone-listen-btn.playing {
+        color: var(--user-msg-bg);
+        animation: pulse-slow 2s infinite;
+      }
+      
+      @keyframes pulse-slow {
+        0% { opacity: 1; }
+        50% { opacity: 0.6; }
+        100% { opacity: 1; }
+      }
+
       .message-action-btn {
         background: transparent;
 
@@ -1899,6 +1940,9 @@
 
       let playbackSpeed = 1.0; // Client-side playback speed
 
+      // Store audio chunks for the current response to allow manual playback
+      let currentResponseAudioChunks = [];
+
       // Theme management
 
       function initTheme() {
@@ -2342,10 +2386,16 @@
                 bytes[i] = audioData.charCodeAt(i);
               }
 
-              audioQueue.push(bytes);
+              // Always buffer the audio for manual playback later
+              currentResponseAudioChunks.push(bytes);
 
-              if (!isPlaying) {
-                playAudioQueue();
+              // Only auto-play if we are in voice mode
+              if (currentMode === "voice") {
+                audioQueue.push(bytes);
+
+                if (!isPlaying) {
+                  playAudioQueue();
+                }
               }
 
               break;
@@ -2353,6 +2403,10 @@
             case "audio_complete":
               console.log("✓ Audio stream complete");
 
+              // Attach the buffered audio to the current assistant message
+              if (currentResponseAudioChunks.length > 0) {
+                 attachAudioToLastMessage([...currentResponseAudioChunks]);
+              }
               break;
 
             case "error":
@@ -2454,9 +2508,21 @@
                 <div class="message-label">AI Assistant</div>
                 <div class="message-timestamp">${formatTime(new Date())}</div>
               </div>
-              <div class="message-content"></div>
+              <div class="content-row">
+                <div class="message-content"></div>
+                <button class="standalone-listen-btn" title="Listen">
+                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                </button>
+              </div>
             </div>
           `;
+          
+          // Add click handler for the new button
+          const btn = streamingMessageElement.querySelector(".standalone-listen-btn");
+          if (btn) {
+             btn.onclick = handleListenClick;
+          }
+          
           chatContainer.appendChild(streamingMessageElement);
           emptyState.style.display = "none";
         }
@@ -2481,6 +2547,15 @@
           if (wrapper && !wrapper.querySelector(".message-actions")) {
             wrapper.appendChild(createMessageActions("assistant"));
           }
+          
+          // Check if audio is already attached (race condition: audio finished before text)
+          if (streamingMessageElement.audioChunks) {
+             const listenBtn = streamingMessageElement.querySelector(".standalone-listen-btn");
+             if (listenBtn) {
+                 listenBtn.style.display = "flex";
+             }
+          }
+          
           streamingMessageElement = null;
         } else {
           // No streaming message, create new one
@@ -2538,9 +2613,26 @@
 
         content.textContent = text;
 
-        wrapper.appendChild(header);
-
-        wrapper.appendChild(content);
+        if (role === "assistant") {
+            const contentRow = document.createElement("div");
+            contentRow.className = "content-row";
+            
+            contentRow.appendChild(content);
+            
+            const listenBtn = document.createElement("button");
+            listenBtn.className = "standalone-listen-btn";
+            listenBtn.title = "Listen";
+            listenBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+            listenBtn.onclick = handleListenClick;
+            
+            contentRow.appendChild(listenBtn);
+            
+            wrapper.appendChild(header);
+            wrapper.appendChild(contentRow);
+        } else {
+            wrapper.appendChild(header);
+            wrapper.appendChild(content);
+        }
 
         wrapper.appendChild(createMessageActions(role));
 
@@ -2555,7 +2647,40 @@
         chatContainer.scrollTop = chatContainer.scrollHeight;
       }
 
-      // Create message actions (copy, reactions)
+      // Handle listen button click
+      function handleListenClick(e) {
+        const btn = e.currentTarget;
+        const messageEl = btn.closest(".message");
+        
+        if (btn.classList.contains("playing")) {
+            // Stop playback
+            stopAudioPlayback();
+            btn.classList.remove("playing");
+            // Reset icon
+            btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+        } else {
+            // Start Playback
+            if (messageEl && messageEl.audioChunks) {
+                // Reset any other playing buttons
+                document.querySelectorAll(".standalone-listen-btn.playing").forEach(b => {
+                    b.classList.remove("playing");
+                    b.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+                });
+                
+                stopAudioPlayback(); // Stop any current audio
+                
+                // Load chunks
+                audioQueue = [...messageEl.audioChunks];
+                playAudioQueue();
+                
+                btn.classList.add("playing");
+                // Stop icon
+                btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+            }
+        }
+      }
+
+      // Create message actions (copy, reactions) - No Listen button here anymore
 
       function createMessageActions(role) {
         const actions = document.createElement("div");
@@ -2590,7 +2715,8 @@
 
           reactions.className = "message-reactions";
 
-          ["👍", "👎", "❤️", "🎯"].forEach((emoji) => {
+          // Removed target/bullseye as requested
+          ["👍", "👎", "❤️"].forEach((emoji) => {
             const btn = document.createElement("button");
 
             btn.className = "reaction-btn";
@@ -2608,6 +2734,27 @@
         }
 
         return actions;
+      }
+      
+      function attachAudioToLastMessage(chunks) {
+        // Try to find the streaming message first
+        let target = streamingMessageElement;
+        
+        // If no streaming message, find the last assistant message
+        if (!target) {
+            const assistantMessages = document.querySelectorAll('.message.assistant');
+            if (assistantMessages.length > 0) {
+                target = assistantMessages[assistantMessages.length - 1];
+            }
+        }
+        
+        if (target) {
+            target.audioChunks = chunks;
+            const listenBtn = target.querySelector('.standalone-listen-btn');
+            if (listenBtn) {
+                listenBtn.style.display = "flex";
+            }
+        }
       }
 
       // Format timestamp
@@ -3027,6 +3174,9 @@
         }
 
         addMessage("user", text);
+        
+        // Clear audio chunks for the new conversation turn
+        currentResponseAudioChunks = [];
       }
 
       // Mode switching
@@ -3039,6 +3189,9 @@
         if (currentMode === "voice" && isRecording) {
           stopRecording();
         }
+        
+        // Stop any audio playback when switching modes
+        stopAudioPlayback();
 
         currentMode = newMode;
 
@@ -3113,6 +3266,9 @@
         );
 
         console.log(`📤 Sent text message: ${text}`);
+        
+        // Clear audio chunks for the new conversation turn
+        currentResponseAudioChunks = [];
       }
 
       // Auto-resize textarea

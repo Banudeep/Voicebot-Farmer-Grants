@@ -636,7 +636,10 @@ class WebVoiceAgent:
 
 async def serve_static(request):
     """Serve static files"""
-    static_dir = Path(__file__).parent / "web_ui"
+    _current_dir = Path(__file__).parent
+    static_dir = _current_dir / "web_ui"
+    if not static_dir.exists():
+        static_dir = _current_dir.parent / "web_ui"
     
     if request.path == '/' or request.path == '':
         file_path = static_dir / "voice_agent.html"

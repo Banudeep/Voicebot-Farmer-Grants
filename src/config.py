@@ -50,7 +50,13 @@ END_OF_SPEECH_TIMEOUT = 0.5  # Reduced from 0.8 for faster processing
 
 # Conversation Settings
 # Load system prompt from YAML file if available
-PROMPTS_DIR = Path(__file__).parent / "prompts"
+# Load system prompt from YAML file if available
+# Check for prompts directory in current dir (src) or parent dir (root)
+_current_dir = Path(__file__).parent
+PROMPTS_DIR = _current_dir / "prompts"
+if not PROMPTS_DIR.exists():
+    PROMPTS_DIR = _current_dir.parent / "prompts"
+
 USDA_PROMPT_FILE = PROMPTS_DIR / "USDA.yml"
 
 def load_system_prompt():
