@@ -89,33 +89,32 @@
 
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        background: var(--bg-primary); /* Primary (Darkest) dominant background */
+        background: var(--bg-primary);
         min-height: 100vh;
         display: flex;
-        align-items: center;
+        align-items: stretch;
         justify-content: center;
         padding: 20px;
+        gap: 20px;
         color: var(--text-primary);
         transition: background-color 0.3s ease, color 0.3s ease;
-        /* Minimalist background for energy efficiency/anti-glare */
         background-image: none;
       }
 
       .container {
-        width: 100%;
+        flex: 1;
         max-width: 900px;
-        background: var(--bg-secondary); /* Secondary (Teal) Card Surface */
+        background: var(--bg-secondary);
         border-radius: 24px;
         box-shadow: var(--shadow-lg);
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        height: 85vh;
-        max-height: 800px;
+        height: 90vh;
+        max-height: 900px;
         transition: background-color 0.3s ease, box-shadow 0.3s ease;
         border: 1px solid var(--border-color);
         position: relative;
-        /* Removed backdrop-filter for energy efficiency */
       }
 
       .container::before {
@@ -643,20 +642,20 @@
 
       .message-content {
         padding: 14px 18px;
-
         border-radius: 18px;
-
         font-size: 1rem;
-
         line-height: 1.6;
-
-        word-wrap: break-word;
-
         box-shadow: var(--shadow-sm);
-
         position: relative;
-
         transition: all 0.2s ease;
+        /* Using inline-block or fit-content inside flex caused aggressive wrapping */
+        max-width: 75%;
+        word-wrap: break-word; /* Allows breaking at arbitrary points if line needs to wrap */
+        overflow-wrap: break-word; /* Standard property for break-word */
+        word-break: normal; /* Changes word breaking rules to normal (break at space) */
+        hyphens: none;
+        -webkit-hyphens: none;
+        -ms-hyphens: none;
       }
 
       .message.user {
@@ -687,13 +686,8 @@
 
       .message.assistant .message-content {
         background: var(--assistant-msg-bg);
-
         color: var(--text-primary);
-
-        max-width: 75%;
-
         border: 1px solid var(--assistant-msg-border);
-
         border-bottom-left-radius: 4px;
       }
 
@@ -717,7 +711,13 @@
         display: flex;
         align-items: center; /* Align center */
         gap: 6px;
+        width: 100%; /* Prevents shrink-wrapping which causes break-word collapse */
         max-width: 100%;
+        flex-wrap: nowrap;
+      }
+      
+      .content-row .message-content {
+        flex-shrink: 0;
       }
       
       .standalone-listen-btn {
@@ -976,47 +976,57 @@
 
         align-items: center;
 
-        gap: 8px;
-
         margin-left: auto;
       }
 
-      .mode-toggle {
+      .mode-toggle-switch {
         display: flex;
-
         align-items: center;
-
-        gap: 8px;
-
-        padding: 6px 12px;
-
         background: var(--bg-tertiary);
-
         border: 1px solid var(--border-color);
-
-        border-radius: 20px;
-
+        border-radius: 25px;
+        padding: 4px;
+        position: relative;
         cursor: pointer;
-
         transition: all 0.2s ease;
+      }
 
+      .mode-toggle-option {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
         font-size: 0.85rem;
-
-        color: var(--text-secondary);
+        font-weight: 500;
+        color: var(--text-tertiary);
+        border-radius: 20px;
+        transition: all 0.2s ease;
+        z-index: 1;
+        cursor: pointer;
+        user-select: none;
       }
 
-      .mode-toggle:hover {
-        background: var(--bg-secondary);
-
-        border-color: var(--text-tertiary);
-      }
-
-      .mode-toggle.active {
-        background: var(--user-msg-bg);
-
+      .mode-toggle-option.active {
         color: white;
+      }
 
-        border-color: var(--user-msg-bg);
+      .mode-toggle-slider {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        height: calc(100% - 8px);
+        width: calc(50% - 4px);
+        background: var(--user-msg-bg);
+        border-radius: 20px;
+        transition: transform 0.25s ease;
+      }
+
+      .mode-toggle-switch[data-mode="voice"] .mode-toggle-slider {
+        transform: translateX(100%);
+      }
+
+      .mode-toggle-switch[data-mode="text"] .mode-toggle-slider {
+        transform: translateX(0);
       }
 
       .mode-toggle-icon {
@@ -1716,6 +1726,273 @@
 
         font-size: 0.9rem;
       }
+
+      /* Document Panel Styles */
+      .page-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        width: 100%;
+        max-width: 1400px;
+      }
+
+      /* Document panel - hidden by default, slides in when form filling */
+      .document-panel {
+        flex: 0 0 0px;
+        max-width: 600px;
+        height: 90vh;
+        max-height: 900px;
+        background: var(--bg-secondary);
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-lg);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        opacity: 0;
+        transition: flex-basis 0.4s ease, opacity 0.3s ease, margin 0.4s ease;
+        margin-left: 0;
+      }
+
+      .document-panel.open {
+        flex: 1 1 500px;
+        opacity: 1;
+        margin-left: 20px;
+      }
+
+      /* Form toggle button (shows when form is active) */
+      .form-toggle-btn {
+        padding: 8px 12px;
+        background: var(--accent-color);
+        border: none;
+        border-radius: 8px;
+        color: var(--bg-primary);
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .form-toggle-btn:hover {
+        opacity: 0.9;
+        transform: scale(1.02);
+      }
+
+      .form-toggle-btn.active {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+      }
+
+      .panel-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .panel-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .panel-title svg {
+        width: 18px;
+        height: 18px;
+        stroke: var(--accent-color);
+      }
+
+      .panel-close-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-tertiary);
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        flex: none;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .panel-close-btn:hover {
+        color: var(--text-primary);
+        background: var(--bg-tertiary);
+      }
+
+      .panel-form-name {
+        padding: 12px 20px;
+        background: var(--bg-tertiary);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .panel-fields {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 20px;
+      }
+
+      .panel-fields::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .panel-fields::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 2px;
+      }
+
+      .field-row {
+        margin-bottom: 16px;
+        animation: fadeSlideIn 0.3s ease-out;
+      }
+
+      @keyframes fadeSlideIn {
+        from {
+          opacity: 0;
+          transform: translateX(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .field-label {
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .field-input {
+        width: 100%;
+        padding: 10px 12px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        font-family: inherit;
+        transition: all 0.2s ease;
+      }
+
+      .field-input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px rgba(160, 232, 175, 0.2);
+      }
+
+      .field-input:hover:not(:focus) {
+        border-color: var(--text-tertiary);
+      }
+
+      .panel-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-tertiary);
+        text-align: center;
+        padding: 40px;
+      }
+
+      .panel-empty-icon {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+        opacity: 0.5;
+      }
+
+      .panel-empty-text {
+        font-size: 0.9rem;
+      }
+
+      /* PDF Viewer Styles */
+      .panel-pdf-container {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        background: var(--bg-tertiary);
+      }
+
+      .pdf-viewer-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: white;
+      }
+
+      .panel-loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-secondary);
+        color: var(--text-tertiary);
+        gap: 12px;
+        font-size: 0.9rem;
+      }
+
+      .panel-loading.hidden {
+        display: none;
+      }
+
+      .loading-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid var(--border-color);
+        border-top-color: var(--accent-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      /* Mobile responsive for split-screen */
+      @media (max-width: 1200px) {
+        body {
+          flex-direction: column;
+          align-items: center;
+        }
+        .container {
+          max-width: 100%;
+          height: 50vh;
+        }
+        .document-panel {
+          max-width: 100%;
+          height: 45vh;
+        }
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 10px;
+          gap: 10px;
+        }
+        .container {
+          height: 55vh;
+          border-radius: 16px;
+        }
+        .document-panel {
+          height: 40vh;
+          border-radius: 16px;
+        }
+      }
     </style>
   </head>
 
@@ -1779,15 +2056,27 @@
           <div class="thinking" id="thinkingIndicator">AI is responding...</div>
 
           <div class="mode-toggle-container">
-            <button
-              class="mode-toggle"
+            <div
+              class="mode-toggle-switch"
               id="modeToggle"
+              data-mode="voice"
               title="Switch between voice and text mode"
             >
-              <span class="mode-toggle-icon" id="modeToggleIcon">🎤</span>
-              <span id="modeToggleText">Voice</span>
-            </button>
+              <div class="mode-toggle-slider"></div>
+              <div class="mode-toggle-option" id="textModeOption" data-mode="text">
+                <span class="mode-toggle-icon">⌨️</span>
+                <span>Text</span>
+              </div>
+              <div class="mode-toggle-option active" id="voiceModeOption" data-mode="voice">
+                <span class="mode-toggle-icon">🎤</span>
+                <span>Voice</span>
+              </div>
+            </div>
           </div>
+
+          <button class="form-toggle-btn" id="formToggleBtn" style="display: none;" title="Toggle form preview">
+            📄 Form
+          </button>
 
           <button class="settings-toggle" id="settingsToggle">
             <span class="icon-settings">⚙</span> Settings
@@ -1901,6 +2190,53 @@
       </div>
     </div>
 
+
+    <!-- Document Side Panel (auto-opens when form filling starts) -->
+    <div class="document-panel" id="documentPanel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <span id="panelTitleText">Form Preview</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="panel-action-btn" id="panelDownloadBtn" title="Download PDF" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: var(--text-primary);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download
+          </button>
+          <button class="panel-close-btn" id="panelCloseBtn" title="Close panel">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      <div class="panel-form-name" id="panelFormName">No form selected</div>
+      <div class="panel-disclaimer" style="padding: 8px 16px; background: rgba(255, 193, 7, 0.1); border-bottom: 1px solid var(--border-color); font-size: 0.75rem; color: #f59e0b; display: flex; align-items: center; gap: 6px;">
+        <span>⚠️</span>
+        <span>Preview only — manual edits here won't be saved. Use the voice assistant to fill the form.</span>
+      </div>
+      
+      <!-- PDF Preview (Read Only) -->
+      <div class="panel-pdf-container active" id="panelPdfContainer" style="display: block;">
+        <iframe id="pdfViewer" class="pdf-viewer-iframe" src="about:blank"></iframe>
+        <div class="panel-loading" id="panelLoading">
+          <div class="loading-spinner"></div>
+          <div>Loading PDF...</div>
+        </div>
+      </div>
+    </div>
+
     <script>
       let ws = null;
 
@@ -1942,6 +2278,18 @@
 
       // Store audio chunks for the current response to allow manual playback
       let currentResponseAudioChunks = [];
+
+      // Audio pre-buffering configuration (reduces initial stutter)
+      const AUDIO_PREBUFFER_MS = 100;  // Buffer 200ms before playing
+      const BYTES_PER_SECOND = TARGET_SAMPLE_RATE * 2;  // 16-bit = 2 bytes per sample
+      const PREBUFFER_BYTES = Math.floor((AUDIO_PREBUFFER_MS / 1000) * BYTES_PER_SECOND);
+      let preBufferThresholdMet = false;
+      let totalBufferedBytes = 0;
+
+      // WebSocket keep-alive configuration
+      let keepAliveInterval = null;
+      const KEEPALIVE_INTERVAL_MS = 15000;  // Send ping every 15 seconds
+
 
       // Theme management
 
@@ -2046,9 +2394,9 @@
 
       const modeToggle = document.getElementById("modeToggle");
 
-      const modeToggleIcon = document.getElementById("modeToggleIcon");
+      const textModeOption = document.getElementById("textModeOption");
 
-      const modeToggleText = document.getElementById("modeToggleText");
+      const voiceModeOption = document.getElementById("voiceModeOption");
 
       const voiceControls = document.getElementById("voiceControls");
 
@@ -2270,6 +2618,25 @@
         }, 3000);
       }
 
+      // WebSocket keep-alive functions
+      function startKeepAlive() {
+        stopKeepAlive();  // Clear any existing interval
+        
+        keepAliveInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            // Send a lightweight ping message
+            ws.send(JSON.stringify({ type: "ping" }));
+          }
+        }, KEEPALIVE_INTERVAL_MS);
+      }
+
+      function stopKeepAlive() {
+        if (keepAliveInterval) {
+          clearInterval(keepAliveInterval);
+          keepAliveInterval = null;
+        }
+      }
+
       // Connect to WebSocket
 
       function connect() {
@@ -2280,6 +2647,10 @@
         }
 
         audioQueue = [];
+        
+        // Reset pre-buffer state for new connection
+        preBufferThresholdMet = false;
+        totalBufferedBytes = 0;
 
         // Determine WebSocket URL based on current hostname
 
@@ -2327,6 +2698,9 @@
           sendTextBtn.disabled = false;
 
           textInput.disabled = false;
+          
+          // Start WebSocket keep-alive
+          startKeepAlive();
         };
 
         ws.onmessage = async (event) => {
@@ -2392,8 +2766,12 @@
               // Only auto-play if we are in voice mode
               if (currentMode === "voice") {
                 audioQueue.push(bytes);
+                totalBufferedBytes += bytes.length;
 
-                if (!isPlaying) {
+                // Pre-buffering: only start playback after threshold is met
+                // This eliminates initial audio stutter
+                if (!isPlaying && (preBufferThresholdMet || totalBufferedBytes >= PREBUFFER_BYTES)) {
+                  preBufferThresholdMet = true;
                   playAudioQueue();
                 }
               }
@@ -2402,6 +2780,15 @@
 
             case "audio_complete":
               console.log("✓ Audio stream complete");
+
+              // Reset pre-buffer state for next response
+              preBufferThresholdMet = false;
+              totalBufferedBytes = 0;
+              
+              // If any audio is still buffered but didn't meet threshold, play it now
+              if (!isPlaying && audioQueue.length > 0) {
+                playAudioQueue();
+              }
 
               // Attach the buffered audio to the current assistant message
               if (currentResponseAudioChunks.length > 0) {
@@ -2421,6 +2808,22 @@
               showToast(data.message, "error");
 
               break;
+
+            case "form_panel":
+              // Handle panel open/close from server
+              if (data.action === "open") {
+                openDocumentPanel(data.form_name, data.fields || {}, data.progress);
+              } else if (data.action === "close") {
+                closeDocumentPanel();
+              }
+              break;
+
+            case "form_update":
+              // Update individual field values in the panel
+              if (data.field_updates) {
+                updatePanelFields(data.form_name, data.field_updates, data.progress);
+              }
+              break;
           }
         };
 
@@ -2434,6 +2837,9 @@
 
         ws.onclose = () => {
           console.log("Disconnected");
+          
+          // Stop keep-alive timer
+          stopKeepAlive();
 
           statusDot.classList.remove("connected", "recording", "speaking");
 
@@ -3195,27 +3601,19 @@
 
         currentMode = newMode;
 
-        // Update UI
+        // Update UI - set data-mode attribute for slider position
+
+        modeToggle.setAttribute("data-mode", newMode);
 
         if (newMode === "voice") {
-          modeToggleIcon.textContent = "🎤";
-
-          modeToggleText.textContent = "Voice";
-
-          modeToggle.classList.remove("active");
-
+          voiceModeOption.classList.add("active");
+          textModeOption.classList.remove("active");
           voiceControls.classList.remove("hidden");
-
           textInputContainer.classList.remove("active");
         } else {
-          modeToggleIcon.textContent = "⌨️";
-
-          modeToggleText.textContent = "Text";
-
-          modeToggle.classList.add("active");
-
+          textModeOption.classList.add("active");
+          voiceModeOption.classList.remove("active");
           voiceControls.classList.add("hidden");
-
           textInputContainer.classList.add("active");
 
           // Focus text input
@@ -3293,10 +3691,16 @@
 
       sendTextBtn.addEventListener("click", sendTextMessage);
 
-      // Mode toggle click
+      // Mode toggle click - detect which option was clicked
 
-      modeToggle.addEventListener("click", () => {
-        switchMode(currentMode === "voice" ? "text" : "voice");
+      modeToggle.addEventListener("click", (e) => {
+        const option = e.target.closest(".mode-toggle-option");
+        if (option) {
+          const mode = option.getAttribute("data-mode");
+          if (mode) {
+            switchMode(mode);
+          }
+        }
       });
 
       // Load saved mode preference
@@ -3307,7 +3711,177 @@
         switchMode(savedMode);
       }
 
+
+      // ======= Document Panel (PDF Viewer) Functions =======
+      const documentPanel = document.getElementById("documentPanel");
+      const panelFormName = document.getElementById("panelFormName");
+      const panelCloseBtn = document.getElementById("panelCloseBtn");
+      const pdfViewer = document.getElementById("pdfViewer");
+      const panelLoading = document.getElementById("panelLoading");
+      
+      let currentFormName = null;
+      let pdfRefreshDebounce = null;
+      
+      function openDocumentPanel(formName, existingFields = {}, progress = null) {
+        currentFormName = formName;
+        
+        // Update form name display
+        panelFormName.textContent = formName || "Form";
+        
+        // Show loading state
+        panelLoading.classList.remove("hidden");
+        
+        // Check if there are existing fields (form already has data)
+        // If yes, load the filled version; if no, load the original form
+        const hasExistingData = existingFields && Object.keys(existingFields).length > 0;
+        const pdfToLoad = hasExistingData ? `filled_${formName}` : formName;
+        loadPdfInViewer(pdfToLoad);
+        
+        // Show the panel with animation
+        documentPanel.classList.add("open");
+        
+        // Show the toggle button in header
+        showFormToggleBtn();
+        
+        console.log("📄 PDF panel opened for:", formName, hasExistingData ? "(with data)" : "(blank form)");
+      }
+      
+      function closeDocumentPanel() {
+        // Form is completed - fully close and reset
+        documentPanel.classList.remove("open");
+        pdfViewer.src = "about:blank";
+        panelFormName.textContent = "No form selected";
+        currentFormName = null;
+        
+        // Hide the toggle button since form is done
+        hideFormToggleBtn();
+        
+        console.log("📄 PDF panel closed");
+      }
+      
+      function loadPdfInViewer(filename) {
+        // Add timestamp to bust cache
+        const pdfUrl = `/pdf/${filename}?t=${Date.now()}`;
+        
+        pdfViewer.onload = () => {
+          panelLoading.classList.add("hidden");
+        };
+        
+        pdfViewer.onerror = () => {
+          panelLoading.classList.add("hidden");
+          console.warn("PDF failed to load:", filename);
+        };
+        
+        pdfViewer.src = pdfUrl;
+      }
+      
+      function updatePanelFields(formName, fieldUpdates, progress = null) {
+        // Check if we're switching to a different form
+        const isNewForm = formName && formName !== currentFormName;
+        
+        // Update form name if different
+        if (isNewForm) {
+          currentFormName = formName;
+          panelFormName.textContent = formName;
+        }
+        
+        // If panel not open yet, open it
+        if (!documentPanel.classList.contains("open")) {
+          openDocumentPanel(formName, {}, progress);
+          return;
+        }
+        
+        // If switching to a NEW form while panel is already open,
+        // load the original blank form first (filled version doesn't exist yet)
+        if (isNewForm) {
+          console.log("📄 Switching to new form:", formName);
+          panelLoading.classList.remove("hidden");
+          loadPdfInViewer(formName);  // Load original blank form
+          return;
+        }
+        
+        // Debounce PDF refresh (don't refresh on every keystroke)
+        if (pdfRefreshDebounce) {
+          clearTimeout(pdfRefreshDebounce);
+        }
+        
+        pdfRefreshDebounce = setTimeout(() => {
+          if (currentFormName) {
+            console.log("🔄 Refreshing PDF view");
+            loadPdfInViewer(`filled_${currentFormName}`);
+          }
+        }, 500); // 500ms debounce
+      }
+      
+      // Form toggle button (shows only when form is active)
+      const formToggleBtn = document.getElementById("formToggleBtn");
+      
+      function showFormToggleBtn() {
+        formToggleBtn.style.display = "block";
+        updateFormToggleBtnState();
+      }
+      
+      function hideFormToggleBtn() {
+        formToggleBtn.style.display = "none";
+      }
+      
+      function updateFormToggleBtnState() {
+        if (documentPanel.classList.contains("open")) {
+          formToggleBtn.classList.add("active");
+          formToggleBtn.textContent = "📄 Hide Form";
+        } else {
+          formToggleBtn.classList.remove("active");
+          formToggleBtn.textContent = "📄 Show Form";
+        }
+      }
+      
+      function toggleDocumentPanel() {
+        if (documentPanel.classList.contains("open")) {
+          documentPanel.classList.remove("open");
+        } else if (currentFormName) {
+          documentPanel.classList.add("open");
+          // Reload PDF if needed - try filled version first, fallback to original
+          if (pdfViewer.src === "about:blank") {
+            // Use a simple approach: always try to load what we have
+            // The loadPdfInViewer handles errors gracefully
+            const filledUrl = `/pdf/filled_${currentFormName}?t=${Date.now()}`;
+            fetch(filledUrl, { method: 'HEAD' })
+              .then(res => {
+                if (res.ok) {
+                  loadPdfInViewer(`filled_${currentFormName}`);
+                } else {
+                  loadPdfInViewer(currentFormName);  // Fallback to original
+                }
+              })
+              .catch(() => loadPdfInViewer(currentFormName));  // Fallback on error
+          }
+        }
+        updateFormToggleBtnState();
+      }
+      
+      // Panel close button - closes panel but keeps form active
+      panelCloseBtn.addEventListener("click", () => {
+        documentPanel.classList.remove("open");
+        updateFormToggleBtnState();
+      });
+      
+      // Download button - opens PDF in new tab for full controls
+      const panelDownloadBtn = document.getElementById("panelDownloadBtn");
+      panelDownloadBtn.addEventListener("click", () => {
+        if (currentFormName) {
+          // Open the filled PDF in a new tab for full zoom/download
+          const pdfUrl = `/pdf/filled_${currentFormName}?t=${Date.now()}`;
+          window.open(pdfUrl, '_blank');
+        }
+      });
+      
+      // Form toggle button - toggle panel visibility
+      formToggleBtn.addEventListener("click", toggleDocumentPanel);
+      
+
+
       // Event listeners
+
 
       startBtn.addEventListener("click", startRecording);
 

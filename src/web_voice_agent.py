@@ -16,6 +16,7 @@ from websockets.exceptions import ConnectionClosed
 from llm_stream import LLMStream
 from stt_stream import STTStream
 from tts_stream import TTSStream
+from mcp_tools.form_tools import get_active_form_state, cleanup_session_files
 import config
 
 class WebVoiceAgent:
@@ -88,7 +89,43 @@ class WebVoiceAgent:
         self.processed_texts = []
         self.last_transcript = None
         self.last_processed_time = 0
-        print("🔄 Session reset - cleared processed text history")
+        self.llm.clear_history()
+        print("🔄 Session reset - cleared processed text history and LLM context")
+    
+    async def _process_complete_speech(self, complete_text: str, trigger_type: str):
+        """Process complete speech through LLM. Used by both semantic and timeout triggers."""
+        if not self.active_connections:
+            return
+        
+        current_time = asyncio.get_event_loop().time()
+        print(f"\n💬 Complete speech ({trigger_type}): {complete_text}")
+        
+        # Update tracking
+        self.last_transcript = complete_text
+        self.last_processed_time = current_time
+        self.processed_texts.append(complete_text)
+        if len(self.processed_texts) > 10:
+            self.processed_texts = self.processed_texts[-10:]
+        
+        # Process through LLM
+        self.is_processing = True
+        websocket = list(self.active_connections)[0]
+        
+        await self._safe_send(websocket, {'type': 'transcript', 'text': complete_text})
+        
+        self.current_processing_task = asyncio.create_task(
+            self.process_message(websocket, complete_text)
+        )
+        self.current_speech = ""
+        self.last_transcript_time = None
+        
+        try:
+            await self.current_processing_task
+        except asyncio.CancelledError:
+            print("🚫 Processing cancelled by user")
+        finally:
+            self.is_processing = False
+            self.current_processing_task = None
         
     async def initialize(self):
         """Initialize all components"""
@@ -105,6 +142,9 @@ class WebVoiceAgent:
         
         await self.llm.initialize()
         await self.stt.connect()
+        
+        # Warm up TTS connection (reduces first-response latency)
+        await self.tts.warmup()
         
         print("All components initialized")
         print("=" * 60)
@@ -195,6 +235,24 @@ class WebVoiceAgent:
                         if text:
                             await self.process_message(websocket, text)
                     
+                    elif msg_type == 'form_field_update':
+                        # Manual edit from UI panel
+                        try:
+                            from mcp_tools.form_tools import update_form_field_from_ui
+                            result = await update_form_field_from_ui(
+                                form_name=data.get('form_name', ''),
+                                field_id=data.get('field_id', ''),
+                                value=data.get('value', '')
+                            )
+                            if config.DEBUG:
+                                print(f"📝 UI edit: {data.get('field_id')} = {data.get('value')}")
+                        except Exception as e:
+                            print(f"⚠️ Form field update error: {e}")
+                    
+                    elif msg_type == 'ping':
+                        # WebSocket keep-alive ping from client
+                        await self._safe_send(websocket, {'type': 'pong'})
+                    
                 except json.JSONDecodeError:
                     print("⚠️ Invalid JSON received")
                     await self._safe_send(websocket, {
@@ -227,6 +285,11 @@ class WebVoiceAgent:
             if config.ENABLE_RECORDINGS and websocket in self.audio_recordings:
                 await self.save_recording(websocket)
             
+            # Clean up session files and reset session state
+            print("Session ending - cleaning up files and history...")
+            self._reset_session()
+            cleanup_session_files()
+            
             self.active_connections.discard(websocket)
             self.greeted_connections.discard(websocket)
     
@@ -235,11 +298,20 @@ class WebVoiceAgent:
         while True:
             try:
                 # Get transcript from STT with timeout
+                # Get transcript from STT with timeout
                 try:
-                    transcript = await asyncio.wait_for(
+                    result_obj = await asyncio.wait_for(
                         self.stt.get_transcript(), 
                         timeout=0.5
                     )
+                    
+                    # Handle both old format (str) and new format (dict)
+                    if isinstance(result_obj, dict):
+                        transcript = result_obj.get("text", "")
+                        is_final_semantic = result_obj.get("is_final", False)
+                    else:
+                        transcript = str(result_obj)
+                        is_final_semantic = False
                     
                     if transcript and transcript.strip():
                         self.asked_to_repeat = False
@@ -284,17 +356,21 @@ class WebVoiceAgent:
                         self.asked_to_repeat = False  # Reset repeat flag
                         
                         if config.DEBUG:
-                            print(f"📝 Hearing: {transcript}")
+                            print(f"📝 Hearing: {transcript} (Final: {is_final_semantic})")
                         
                         # Show live transcript in UI (this triggers audio stop in browser)
-                        # Only send if not a duplicate
                         if self.active_connections:
                             websocket = list(self.active_connections)[0]
                             await self._safe_send(websocket, {
                                 'type': 'transcript_partial',  # Mark as partial
                                 'text': self.current_speech,
-                                'is_duplicate': False  # Explicitly mark as not duplicate
+                                'is_duplicate': False
                             })
+                            
+                        # FAST SEMANTIC TRIGGER - process immediately
+                        if is_final_semantic:
+                            print(f"⚡ FAST TRIGGER: Semantic match for '{transcript}'")
+                            await self._process_complete_speech(transcript, "Semantic")
                 
                 except asyncio.TimeoutError:
                     pass
@@ -303,104 +379,28 @@ class WebVoiceAgent:
                     if self.current_speech and self.last_transcript_time and not self.is_processing:
                         time_since_last = asyncio.get_event_loop().time() - self.last_transcript_time
                         
-                        # If enough silence, collect transcripts for a bit to get the best one
+                        # If enough silence, verify it wasn't already processed
                         if time_since_last >= config.END_OF_SPEECH_TIMEOUT:
-                            # Collect transcripts for 0.3 seconds to get the second (more accurate) version (reduced for faster response)
-                            collected_transcripts = [self.current_speech.strip()]
-                            start_collection_time = asyncio.get_event_loop().time()
+                            # Standard timeout logic as fallback for partial results
+                            # ... (existing fallback logic logic below)
+                            complete_text = self.current_speech.strip()
                             
-                            # Keep checking for better transcripts for 0.3 seconds
-                            while (asyncio.get_event_loop().time() - start_collection_time) < 0.3:
-                                try:
-                                    # Quick check for new transcript
-                                    new_transcript = await asyncio.wait_for(
-                                        self.stt.get_transcript(),
-                                        timeout=0.1
-                                    )
-                                    if new_transcript and new_transcript.strip():
-                                        collected_transcripts.append(new_transcript.strip())
-                                        self.current_speech = new_transcript  # Update buffer
-                                        self.last_transcript_time = asyncio.get_event_loop().time()
-                                except asyncio.TimeoutError:
-                                    # No new transcript, continue waiting
-                                    await asyncio.sleep(0.1)
-                            
-                            # Pick the BEST transcript (usually the longest/most complete = second one)
-                            if collected_transcripts:
-                                # Sort by length (longer usually = more complete with punctuation)
-                                collected_transcripts.sort(key=len, reverse=True)
-                                complete_text = collected_transcripts[0]
-                                
-                                if len(collected_transcripts) > 1:
-                                    print(f"📝 Collected {len(collected_transcripts)} versions, using best: '{complete_text}'")
-                            else:
-                                complete_text = self.current_speech.strip()
-                            
-                            # DEDUPLICATION - check before processing
+                            # Check duplication again (since Fast Trigger might have handled it)
                             current_time = asyncio.get_event_loop().time()
                             is_duplicate = False
                             time_since_processed = current_time - self.last_processed_time
-                            
-                            # 1. Ignore late-arriving transcripts (Azure Speech refined versions)
+
                             if self._is_late_transcript(current_time):
-                                print(f"🔄 Ignoring late transcript ({time_since_processed:.1f}s after last): '{complete_text}'")
                                 is_duplicate = True
-                            
-                            # 2. Check if identical to last processed transcript
                             elif (self.last_transcript and 
                                 complete_text.strip().lower() == self.last_transcript.strip().lower() and 
                                 time_since_processed < 5.0):
-                                print(f"🔄 Ignoring duplicate input: '{complete_text}'")
                                 is_duplicate = True
                                 
-                            # 3. Check if it's a substring of the last one
-                            elif (self.last_transcript and 
-                                  complete_text.strip().lower() in self.last_transcript.strip().lower() and 
-                                  time_since_processed < 3.0):
-                                print(f"🔄 Ignoring substring input: '{complete_text}'")
-                                is_duplicate = True
-
                             if complete_text and not is_duplicate:
-                                print(f"\n💬 Complete speech: {complete_text}")
-                                
-                                # Update tracking
-                                self.last_transcript = complete_text
-                                self.last_processed_time = current_time
-                                # Add to list of processed texts (for stripping from cumulative transcripts)
-                                self.processed_texts.append(complete_text)
-                                # Limit to last 10 processed texts to prevent memory issues
-                                if len(self.processed_texts) > 10:
-                                    self.processed_texts = self.processed_texts[-10:]
-                                
-                                # Process through LLM
-                                if self.active_connections:
-                                    self.is_processing = True
-                                    websocket = list(self.active_connections)[0]
-                                    
-                                    # Send final transcript
-                                    await self._safe_send(websocket, {
-                                        'type': 'transcript',
-                                        'text': complete_text
-                                    })
-                                    
-                                    # Process and send response (track task for cancellation)
-                                    self.current_processing_task = asyncio.create_task(
-                                        self.process_message(websocket, complete_text)
-                                    )
-                                    
-                                    # Clear buffer IMMEDIATELY after starting processing
-                                    self.current_speech = ""
-                                    self.last_transcript_time = None
-                                    
-                                    try:
-                                        await self.current_processing_task
-                                    except asyncio.CancelledError:
-                                        print("🚫 Processing cancelled by user")
-                                    finally:
-                                        self.is_processing = False
-                                        self.current_processing_task = None
+                                await self._process_complete_speech(complete_text, "Timeout")
                             
-                            # Double ensure clear buffer if not processed
+                            # Clear buffer if not processed
                             if not self.is_processing:
                                 self.current_speech = ""
                                 self.last_transcript_time = None
@@ -486,7 +486,7 @@ class WebVoiceAgent:
             return False
     
     async def process_message(self, websocket, user_text: str):
-        """Process user message through LLM and TTS with streaming for faster response"""
+        """Process user message with speculative TTS execution for faster response"""
         try:
             # Notify thinking
             if not await self._safe_send(websocket, {
@@ -501,8 +501,111 @@ class WebVoiceAgent:
             # Use streaming response for faster time-to-first-audio
             full_response = []
             first_audio_sent = False
+            filler_sent = False  # Track if we've already sent a filler for this query
             
-            async for sentence, is_final in self.llm.generate_response_streaming(user_text):
+            # Speculative TTS: Queue for ordered audio results
+            tts_queue = asyncio.Queue()
+            tts_tasks = []
+            sentence_order = [0]  # Use list to allow modification in nested function
+            
+            async def synthesize_and_queue(sentence: str, order: int):
+                """Synthesize audio in parallel, queue with order for sequential playback"""
+                try:
+                    audio_data = await self.tts.synthesize(sentence)
+                    await tts_queue.put((order, audio_data, sentence))
+                except Exception as e:
+                    if config.DEBUG:
+                        print(f"⚠️ TTS error for sentence {order}: {e}")
+                    await tts_queue.put((order, None, sentence))
+            
+            async def send_audio_in_order():
+                """Send audio chunks maintaining sentence order"""
+                nonlocal first_audio_sent
+                expected_order = 0
+                pending = {}
+                
+                while True:
+                    try:
+                        # Wait for next audio result with timeout
+                        order, audio_data, sentence = await asyncio.wait_for(
+                            tts_queue.get(), timeout=0.1
+                        )
+                        pending[order] = (audio_data, sentence)
+                        
+                        # Send any ready audio in order
+                        while expected_order in pending:
+                            audio, sent = pending.pop(expected_order)
+                            if audio:
+                                if config.DEBUG and not first_audio_sent:
+                                    print(f"🔊 Starting TTS for first sentence...")
+                                    first_audio_sent = True
+                                
+                                chunk_size = 8192
+                                for i in range(0, len(audio), chunk_size):
+                                    chunk = audio[i:i + chunk_size]
+                                    await self._safe_send(websocket, {
+                                        'type': 'audio_chunk',
+                                        'audio': base64.b64encode(chunk).decode('utf-8')
+                                    })
+                            expected_order += 1
+                    except asyncio.TimeoutError:
+                        # Check if all tasks are done and queue is empty
+                        # IMPORTANT: Only exit if we have at least one task (avoid exiting during tool execution delay)
+                        if tts_tasks and all(t.done() for t in tts_tasks) and tts_queue.empty():
+                            # Send any remaining pending items
+                            while expected_order in pending:
+                                audio, _ = pending.pop(expected_order)
+                                if audio:
+                                    chunk_size = 8192
+                                    for i in range(0, len(audio), chunk_size):
+                                        chunk = audio[i:i + chunk_size]
+                                        await self._safe_send(websocket, {
+                                            'type': 'audio_chunk',
+                                            'audio': base64.b64encode(chunk).decode('utf-8')
+                                        })
+                                expected_order += 1
+                            break
+                    except Exception as e:
+                        if config.DEBUG:
+                            print(f"⚠️ Audio sender error: {e}")
+                        break
+            
+            # Filler callback for instant audio feedback during tool execution
+            async def send_filler_audio(filler_text: str):
+                """Send filler audio immediately when a tool is about to execute."""
+                nonlocal first_audio_sent, filler_sent
+                
+                if filler_sent or not filler_text:
+                    return
+                filler_sent = True
+                
+                await self._safe_send(websocket, {
+                    'type': 'response_text',
+                    'text': filler_text,
+                    'is_filler': True
+                })
+                
+                try:
+                    audio_data = await self.tts.synthesize(filler_text)
+                    if audio_data:
+                        if config.DEBUG:
+                            print(f"🎙️ Filler: {filler_text}")
+                        chunk_size = 8192
+                        for i in range(0, len(audio_data), chunk_size):
+                            chunk = audio_data[i:i + chunk_size]
+                            await self._safe_send(websocket, {
+                                'type': 'audio_chunk',
+                                'audio': base64.b64encode(chunk).decode('utf-8')
+                            })
+                        first_audio_sent = True
+                except Exception as e:
+                    if config.DEBUG:
+                        print(f"⚠️ Filler audio error: {e}")
+            
+            # Start audio sender task (runs concurrently)
+            audio_sender = asyncio.create_task(send_audio_in_order())
+            
+            async for sentence, is_final in self.llm.generate_response_streaming(user_text, filler_callback=send_filler_audio):
                 if not sentence:
                     continue
                     
@@ -515,26 +618,26 @@ class WebVoiceAgent:
                     'text': current_text,
                     'is_streaming': not is_final
                 }):
-                    return  # Connection closed
+                    # Connection closed - cancel tasks
+                    audio_sender.cancel()
+                    for t in tts_tasks:
+                        t.cancel()
+                    return
                 
-                # Synthesize and send audio for this sentence immediately
+                # Fire-and-forget TTS synthesis (speculative execution)
                 if sentence.strip():
-                    if config.DEBUG and not first_audio_sent:
-                        print("🔊 Starting TTS for first sentence...")
-                        first_audio_sent = True
-                    
-                    audio_data = await self.tts.synthesize(sentence)
-                    
-                    if audio_data:
-                        # Send audio in chunks
-                        chunk_size = 8192
-                        for i in range(0, len(audio_data), chunk_size):
-                            chunk = audio_data[i:i + chunk_size]
-                            if not await self._safe_send(websocket, {
-                                'type': 'audio_chunk',
-                                'audio': base64.b64encode(chunk).decode('utf-8')
-                            }):
-                                return  # Connection closed
+                    task = asyncio.create_task(
+                        synthesize_and_queue(sentence, sentence_order[0])
+                    )
+                    tts_tasks.append(task)
+                    sentence_order[0] += 1
+            
+            # Wait for all TTS to complete
+            if tts_tasks:
+                await asyncio.gather(*tts_tasks, return_exceptions=True)
+            
+            # Wait for audio sender to finish
+            await audio_sender
             
             # Check for any form updates from the LLM (via form_tools)
             try:
@@ -542,11 +645,7 @@ class WebVoiceAgent:
                 form_updates = get_pending_form_updates()
                 if form_updates:
                     for update in form_updates:
-                        for conn in self.active_connections:
-                            try:
-                                await conn.send(json.dumps(update))
-                            except:
-                                pass
+                        await self._safe_send(websocket, update)
                     if config.DEBUG:
                         print(f"📝 Sent {len(form_updates)} form update(s)")
             except ImportError:
@@ -661,9 +760,44 @@ async def serve_static(request):
     return web.Response(text="File not found", status=404)
 
 
+async def serve_pdf(request):
+    """Serve PDF files from Document folder"""
+    from pathlib import Path
+    
+    filename = request.match_info.get('filename', '')
+    
+    # Security: only allow .pdf files, no path traversal
+    if '..' in filename or '/' in filename or '\\' in filename:
+        return web.Response(text="Invalid filename", status=400)
+    
+    if not filename.endswith('.pdf'):
+        return web.Response(text="Not a PDF", status=400)
+    
+    # Document folder is at project root (resolved to absolute path)
+    # This handles cases where __file__ is relative or symlinked
+    file_path = Path(__file__).resolve()
+    document_dir = file_path.parent.parent / "Document"
+    pdf_path = document_dir / filename
+    
+    if pdf_path.exists() and pdf_path.is_file():
+        return web.Response(
+            body=pdf_path.read_bytes(),
+            content_type='application/pdf',
+            headers={
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        )
+    
+    return web.Response(text="PDF not found", status=404)
+
 async def websocket_handler(request, agent):
-    """Handle WebSocket upgrade requests on HTTP server"""
-    ws = web.WebSocketResponse()
+    """Handle WebSocket upgrade requests on HTTP server with keep-alive"""
+    ws = web.WebSocketResponse(
+        heartbeat=20.0,       # Send ping every 20 seconds
+        receive_timeout=30.0  # Close if no response within 30 seconds
+    )
     await ws.prepare(request)
     await agent.handle_websocket(ws, None, request=request)
     return ws
@@ -674,6 +808,9 @@ async def init_http_server(agent):
     
     # WebSocket endpoint
     app.router.add_get('/ws', lambda request: websocket_handler(request, agent))
+    
+    # PDF serving endpoint (for document panel viewer)
+    app.router.add_get('/pdf/{filename}', serve_pdf)
     
     # Static file serving (must be last to catch all other paths)
     app.router.add_get('/{path:.*}', serve_static)

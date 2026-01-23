@@ -16,20 +16,48 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-# Try to import pypdf for PDF form filling
 try:
     from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import NameObject, BooleanObject, DictionaryObject, TextStringObject, NumberObject
     HAS_PYPDF = True
 except ImportError:
     HAS_PYPDF = False
 
-# Base directory for documents
-# Path: src/mcp_tools/form_tools.py -> src/mcp_tools -> src -> root
-DOCUMENT_DIR = Path(__file__).parent.parent.parent / "Document"
+# Base directory for documents (project root)
+DOCUMENT_DIR = Path(__file__).resolve().parent.parent.parent / "Document"
 
 # In-memory storage for form data
 # Structure: { form_name: { field_id: value } }
 _FORM_DATA = {}
+
+# Cache for form schemas (to track total field count for progress)
+# Structure: { form_name: { field_id: {...} } }
+_FORM_SCHEMAS_CACHE = {}
+
+# Cache for the exact count of farmer-relevant fields (set by get_form_fields)
+# Structure: { form_name: int }
+_FARMER_FIELD_COUNT = {}
+
+# Queue for pending form updates to broadcast to UI
+# Each item: { 'type': 'form_update', 'form_name': str, 'field_updates': dict, 'action': str }
+_PENDING_UPDATES = []
+
+
+# Track active form session for auto-open/close
+_ACTIVE_FORM = None
+
+def _load_static_descriptions():
+    """Load pre-calculated form metadata from scraper output."""
+    try:
+        metadata_path = Path(__file__).resolve().parent.parent / "scraper" / "form_metadata.json"
+        if metadata_path.exists():
+            with open(metadata_path, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Warning: Failed to load form metadata: {e}")
+    return {}
+
+STATIC_FORM_DESCRIPTIONS = _load_static_descriptions()
 
 def _get_available_forms() -> List[str]:
     """List available PDF forms in the Document directory."""
@@ -45,7 +73,10 @@ def _get_form_schema(form_name: str) -> Dict[str, Any]:
     if not HAS_PYPDF:
         return {"error": "pypdf not installed"}
     
-    pdf_path = DOCUMENT_DIR / form_name
+    # Check cache first (OPTIMIZATION)
+    if form_name in _FORM_SCHEMAS_CACHE:
+        return _FORM_SCHEMAS_CACHE[form_name]
+    
     pdf_path = DOCUMENT_DIR / form_name
     if not pdf_path.exists():
         # Help the LLM self-correct by listing actual available forms
@@ -74,6 +105,9 @@ def _get_form_schema(form_name: str) -> Dict[str, Any]:
                     "description": tooltip or field_name,
                     "full_name": field_name
                 }
+        
+        # Cache the schema for progress tracking
+        _FORM_SCHEMAS_CACHE[form_name] = schema
         return schema
     except Exception as e:
         return {"error": f"Failed to read form schemas: {e}"}
@@ -84,10 +118,37 @@ def _get_form_data(form_name: str) -> dict:
         _FORM_DATA[form_name] = {}
     return _FORM_DATA[form_name]
 
-def _clear_form_data(form_name: str):
-    """Clear form data after sending"""
-    if form_name in _FORM_DATA:
-        _FORM_DATA[form_name] = {}
+def _get_form_progress(form_name: str) -> Dict[str, int]:
+    """Get form filling progress: filled count vs total farmer-relevant fields.
+    
+    Uses the cached count from get_form_fields to ensure the total matches
+    exactly what the voicebot asks the farmer.
+    """
+    form_data = _get_form_data(form_name)
+    filled = len(form_data)
+    
+    # Use cached farmer field count (set by get_form_fields)
+    # This ensures the counter matches exactly what the voicebot asks
+    total = _FARMER_FIELD_COUNT.get(form_name, filled + 5)  # Fallback if not yet cached
+    
+    return {"filled": filled, "total": max(total, filled)}
+
+
+def get_active_form_state() -> Dict[str, Any]:
+    """Get the current active form state for session restore.
+    
+    Called when a client reconnects to restore the form panel if a form was active.
+    """
+    if not _ACTIVE_FORM:
+        return None
+    
+    form_data = _get_form_data(_ACTIVE_FORM)
+    return {
+        'type': 'form_panel',
+        'action': 'open',
+        'form_name': _ACTIVE_FORM,
+        'fields': dict(form_data)
+    }
 
 async def list_available_forms() -> Dict[str, Any]:
     """List all forms available for filling."""
@@ -101,43 +162,168 @@ async def list_available_forms() -> Dict[str, Any]:
 async def get_form_fields(form_name: str) -> Dict[str, Any]:
     """
     Get the list of fields for a specific form so the AI knows what to ask for.
+    Also opens the form panel in the UI.
     """
+    global _ACTIVE_FORM
+    
     schema = _get_form_schema(form_name)
     if "error" in schema:
         return {"success": False, "error": schema["error"]}
     
-    # simplify for the LLM
-    fields_summary = []
-    for fid, data in schema.items():
-        # Only show TEXT fields (/Tx) to avoid pypdf checkbox/radio button issues (/Btn causes /AP crashes)
-        # This simplifies the form for the voice agent and prevents the 'Button' crash
-        if data['type'] == '/Tx': 
-            # Filter out "Office Use" fields so the AI doesn't ask the farmer for them
-            desc_lower = (data['description'] or "").lower()
-            id_lower = fid.lower()
-            
-            # Keywords indicating fields NOT for the farmer
-            skip_keywords = [
-                "office use", "official use", "agency use only", 
-                "signature of ccc", "signature of representative", 
-                "date received", "coc signature", "approved by",
-                "disapproved", "remarks", "reviewer"
-            ]
-            
-            if any(k in desc_lower for k in skip_keywords) or any(k in id_lower for k in skip_keywords):
-                continue
-                
-            fields_summary.append({
-                "field_id": fid,
-                "description": data['description'],
-                "type": "text"
-            })
+    # Open the form panel immediately when form fields are requested
+    # This shows the PDF viewer as soon as the first question is about to be asked
+    if _ACTIVE_FORM != form_name:
+        _ACTIVE_FORM = form_name
+        form_data = _get_form_data(form_name)
+        progress = _get_form_progress(form_name)
+        _PENDING_UPDATES.append({
+            'type': 'form_panel',
+            'action': 'open',
+            'form_name': form_name,
+            'fields': dict(form_data),  # Existing fields (if any)
+            'progress': progress  # {filled: N, total: M}
+        })
+    
+    # Use shared helper to get farmer-relevant fields
+    fields_summary = _get_farmer_fields(schema)
+    
+    # Cache the count so progress bar shows the exact same number
+    _FARMER_FIELD_COUNT[form_name] = len(fields_summary)
             
     return {
         "success": True,
         "form_name": form_name,
         "fields": fields_summary,
         "total_fields": len(fields_summary)
+    }
+
+def _get_farmer_fields(schema: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Extract only the fields relevant to the farmer, filtering out office use, signatures, etc.
+    Also categorizes fields for summary.
+    """
+    fields_summary = []
+    for fid, data in schema.items():
+        # Only show TEXT fields (/Tx)
+        # This simplifies the form for the voice agent and prevents the 'Button' crash
+        if data['type'] == '/Tx': 
+            desc_lower = (data['description'] or "").lower()
+            id_lower = fid.lower()
+            
+            # 1. EXCLUSION LIST (Expanded)
+            skip_keywords = [
+                # General office use
+                "office use", "official use", "agency use only", "for fsa use",
+                # Signature fields not for farmer (bot handles sending, not signing on screen usually, or user signs later)
+                "signature of ccc", "signature of representative", 
+                "signature of nrcs", "signature of coc", "signature of sed",
+                "nrcs employee", "coc signature", "sed/dd", "date signed", "signature date",
+                # Administrative sections
+                "date received", "approved by", "disapproved", "remarks", "reviewer",
+                "date returned", "date referred", "fsa completes", "state code", "county code",
+                # PART sections often reserved
+                "part b", "part c", "part d",
+                "nrcs information", "coc and concurrences", "mitigation plan",
+                # Concurrence fields
+                "concur", "technical concurrence"
+            ]
+            
+            if any(k in desc_lower for k in skip_keywords) or any(k in id_lower for k in skip_keywords):
+                continue
+
+            # 2. CATEGORIZATION
+            category = "General Information"
+            
+            # Heuristics for keywords
+            if any(k in id_lower or k in desc_lower for k in ["name", "address", "phone", "email", "zip", "contact", "producer"]):
+                category = "Contact Information"
+            elif any(k in id_lower or k in desc_lower for k in ["ssn", "tax", "social security", "identification", "id number"]):
+                category = "Identification"
+            elif any(k in id_lower or k in desc_lower for k in ["farm", "tract", "crop", "acre", "commodity", "livestock", "land"]):
+                category = "Farm Details"
+            elif any(k in id_lower or k in desc_lower for k in ["date", "year"]):
+                category = "Dates"
+                
+            fields_summary.append({
+                "field_id": fid,
+                "description": data['description'],
+                "type": "text",
+                "category": category
+            })
+    return fields_summary
+
+async def get_form_summary(form_name: str) -> Dict[str, Any]:
+    """
+    Get a summary of the form to present to the user BEFORE starting.
+    Uses pre-calculated static descriptions for speed.
+    """
+    # Check if we have a static description for this form
+    if form_name in STATIC_FORM_DESCRIPTIONS:
+        desc = STATIC_FORM_DESCRIPTIONS[form_name]
+        
+        # Build category summary string
+        cat_summaries = []
+        if "categories" in desc:
+            for cat, num in desc["categories"].items():
+                if num > 0:
+                    cat_summaries.append(f"{cat} ({num} fields)")
+        
+        cat_text = ", ".join(cat_summaries)
+        count = desc.get("field_count", 0)
+        estimated_time = desc.get("estimated_time", "unknown")
+        
+        message = (f"This form requires information about: {cat_text}. "
+                   f"There are {count} questions in total, which should take about {estimated_time}.")
+                   
+        return {
+            "success": True,
+            "form_name": form_name,
+            "total_fields": count,
+            "categories": desc.get("categories", {}),
+            "estimated_time": estimated_time,
+            "message": message,
+            "note": "These counts exclude office-use sections (pre-calculated)."
+        }
+
+    # Fallback to dynamic inspection if not in static list
+    schema = _get_form_schema(form_name)
+    if "error" in schema:
+        return {"success": False, "error": schema["error"]}
+    
+    # Get only the fields the farmer needs to fill
+    farmer_fields = _get_farmer_fields(schema)
+    count = len(farmer_fields)
+    
+    # Group by category
+    categories = {}
+    for f in farmer_fields:
+        cat = f.get('category', 'General Information')
+        if cat not in categories:
+            categories[cat] = 0
+        categories[cat] += 1
+        
+    # Build descriptive message
+    cat_summaries = []
+    for cat, num in categories.items():
+        if num > 0:
+            cat_summaries.append(f"{cat} ({num} fields)")
+    
+    cat_text = ", ".join(cat_summaries)
+    
+    # Estimate time: ~30 seconds per field (conservative estimate)
+    estimated_minutes = max(1, round(count * 0.5))
+    
+    message = (f"This form requires information about: {cat_text}. "
+               f"There are {count} questions in total, which should take about {estimated_minutes} minutes.")
+
+    return {
+        "success": True,
+        "form_name": form_name,
+        "total_fields": count,
+        "categories": categories,
+        "estimated_time": f"{estimated_minutes} minutes",
+        "message": message,
+        "note": "These counts exclude office-use sections."
     }
 
 async def fill_form_field(
@@ -148,6 +334,8 @@ async def fill_form_field(
     """
     Store a value for a specific form field.
     """
+    global _ACTIVE_FORM
+    
     schema = _get_form_schema(form_name)
     if "error" in schema:
         return {"success": False, "error": schema["error"]}
@@ -159,8 +347,45 @@ async def fill_form_field(
             "error": f"Invalid field_id '{field_id}'. Use get_form_fields to see valid IDs."
         }
 
+    # Normalize voice input before validation (fixes common transcription errors)
+    normalized_value = _normalize_voice_input(value, field_id)
+    
+    # Validate input
+    validation_error = _validate_field_input(field_id, normalized_value, schema.get(field_id, {}))
+    if validation_error:
+        return {
+            "success": False,
+            "error": validation_error,
+            "validation_failed": True,
+            "original_value": value,
+            "normalized_value": normalized_value
+        }
+
     form_data = _get_form_data(form_name)
-    form_data[field_id] = value
+    
+    # Check if this is a new form session (for auto-open)
+    is_new_session = _ACTIVE_FORM != form_name
+    if is_new_session:
+        _ACTIVE_FORM = form_name
+        # Queue panel open event with all current fields
+        _PENDING_UPDATES.append({
+            'type': 'form_panel',
+            'action': 'open',
+            'form_name': form_name,
+            'fields': dict(form_data)  # Existing fields (if any)
+        })
+    
+    # Update the field with normalized value
+    form_data[field_id] = normalized_value
+    
+    # Queue update for UI broadcast with progress
+    progress = _get_form_progress(form_name)
+    _PENDING_UPDATES.append({
+        'type': 'form_update',
+        'form_name': form_name,
+        'field_updates': {field_id: normalized_value},
+        'progress': progress  # {filled: N, total: M}
+    })
     
     # Auto-save the PDF to disk so user can see progress
     saved_filename = f"filled_{form_name}"
@@ -173,13 +398,196 @@ async def fill_form_field(
     except Exception as e:
         save_status = f" (Auto-save failed: {str(e)})"
     
-    return {
+    # Include original vs normalized if they differ
+    result = {
         "success": True,
         "form_name": form_name,
         "field_id": field_id,
-        "value": value,
+        "value": normalized_value,
         "status": "saved" + save_status
     }
+    if normalized_value != value:
+        result["original_input"] = value
+        result["was_normalized"] = True
+    
+    return result
+
+def _normalize_voice_input(value: str, field_id: str) -> str:
+    """
+    Normalize voice transcription input to fix common speech-to-text issues.
+    Returns the cleaned/normalized value.
+    """
+    normalized = str(value).strip()
+    field_id_lower = field_id.lower()
+    
+    # Remove common voice artifacts/fillers
+    filler_words = [
+        r'\b(um|uh|uhh|umm|er|ah|ahh|hmm|hm)\b',
+        r'\b(like|you know|i mean|so|well|actually)\b',
+        r'\b(wait wait wait|wait wait|wait a second|hold on)\b',
+        r'\b(let me think|let me see)\b'
+    ]
+    for pattern in filler_words:
+        normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
+    
+    # Clean up extra whitespace
+    normalized = ' '.join(normalized.split())
+    
+    # Email-specific corrections (for email fields)
+    if "email" in field_id_lower or "@" in normalized or " at " in normalized.lower():
+        # Common voice transcription fixes for email
+        email_corrections = [
+            (r'\s+at\s+', '@'),                    # "john at gmail" -> "john@gmail"
+            (r'\s+dot\s+', '.'),                   # "gmail dot com" -> "gmail.com"
+            (r'@gmail@gmail', '@gmail'),           # "gmail at gmail" duplication fix
+            (r'@(\w+)@', r'@\1.'),                 # Repeated @ symbol -> single @ and dot
+            (r'(\w)@(\w+)\.(\w+)@.*', r'\1@\2.\3'), # Strip trailing @ duplicates
+            (r'\s+', ''),                          # Remove all spaces in email
+        ]
+        for pattern, replacement in email_corrections:
+            normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+        
+        # Common domain typos from voice
+        domain_fixes = {
+            'gmailcom': 'gmail.com',
+            'yahoocom': 'yahoo.com',
+            'hotmailcom': 'hotmail.com',
+            'outlookcom': 'outlook.com',
+        }
+        for typo, fix in domain_fixes.items():
+            if typo in normalized.lower():
+                normalized = re.sub(typo, fix, normalized, flags=re.IGNORECASE)
+    
+    # Phone number normalization
+    if "phone" in field_id_lower or "tel" in field_id_lower:
+        # Extract just the digits
+        digits = re.sub(r'\D', '', normalized)
+        if len(digits) == 10:
+            # Format as (XXX) XXX-XXXX
+            normalized = f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+        elif len(digits) == 11 and digits[0] == '1':
+            # US number with country code
+            normalized = f"({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+    
+    # SSN normalization
+    if "ssn" in field_id_lower or "social" in field_id_lower or "security" in field_id_lower:
+        digits = re.sub(r'\D', '', normalized)
+        if len(digits) == 9:
+            # Format as XXX-XX-XXXX
+            normalized = f"{digits[:3]}-{digits[3:5]}-{digits[5:]}"
+    
+    # ZIP code normalization
+    if "zip" in field_id_lower or "postal" in field_id_lower:
+        digits = re.sub(r'\D', '', normalized)
+        if len(digits) == 5:
+            normalized = digits
+        elif len(digits) == 9:
+            # ZIP+4 format
+            normalized = f"{digits[:5]}-{digits[5:]}"
+    
+    return normalized
+
+
+def _validate_field_input(field_id: str, value: str, field_metadata: dict) -> Optional[str]:
+    """
+    Validate input value against field type and semantic rules.
+    Returns error message string if invalid, None if valid.
+    """
+    field_id_lower = field_id.lower()
+    value_str = str(value).strip()
+    
+    # 1. Semantic Check: Address vs Email
+    # If field asks for "Address" but user provides an Email
+    if "address" in field_id_lower and "email" not in field_id_lower:
+        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        if re.match(email_pattern, value_str):
+            return (f"Invalid input: You provided an email address ('{value_str}'), but the field '{field_id}' "
+                    "appears to require a physical address. Please ask the user for their street address.")
+
+    # 2. Email Format Validation
+    if "email" in field_id_lower:
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, value_str):
+            return (f"Invalid email format: '{value_str}'. Please provide a valid email address "
+                    "(e.g., name@example.com). Ask the user to spell out their email clearly.")
+
+    # 3. Phone Number Validation
+    if "phone" in field_id_lower or "tel" in field_id_lower:
+        # Extract digits to validate
+        digits = re.sub(r'\D', '', value_str)
+        if len(digits) < 10:
+            return (f"Invalid phone number: '{value_str}'. Phone numbers must have at least 10 digits. "
+                    "Please ask the user for their complete phone number including area code.")
+        if len(digits) > 11:
+            return (f"Invalid phone number: '{value_str}'. Too many digits ({len(digits)}). "
+                    "Please verify the phone number with the user.")
+
+    # 4. ZIP Code Validation
+    if "zip" in field_id_lower or "postal" in field_id_lower:
+        digits = re.sub(r'\D', '', value_str)
+        if len(digits) not in [5, 9]:
+            return (f"Invalid ZIP code: '{value_str}'. US ZIP codes must be 5 digits (e.g., 12345) "
+                    "or 9 digits for ZIP+4 (e.g., 12345-6789). Please ask the user for their ZIP code.")
+
+    # 5. SSN / Tax ID Validation
+    if "ssn" in field_id_lower or "social" in field_id_lower or "security" in field_id_lower or "tax" in field_id_lower:
+        digits = re.sub(r'\D', '', value_str)
+        if len(digits) != 9:
+            return (f"Invalid SSN/Tax ID: '{value_str}'. Social Security Numbers must have exactly 9 digits "
+                    "(format: XXX-XX-XXXX). Please ask the user to provide all 9 digits.")
+        # Check for obviously invalid SSNs (all zeros in any group)
+        if digits[:3] == '000' or digits[3:5] == '00' or digits[5:] == '0000':
+            return (f"Invalid SSN: '{value_str}'. This appears to be an invalid Social Security Number. "
+                    "Please verify with the user.")
+
+    # 6. Date Format and Range Validation
+    if "date" in field_id_lower or "dob" in field_id_lower:
+        # Allow MM/DD/YYYY or M/D/YYYY
+        date_pattern = r'^(0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12][0-9]|3[01])[\/\-](\d{4})$'
+        match = re.match(date_pattern, value_str)
+        if not match:
+            return (f"Invalid date format: '{value_str}'. Dates must be in MM/DD/YYYY format (e.g., 05/21/2024). "
+                    "Please ask the user to provide the date in this format.")
+        
+        # Parse and validate date range
+        try:
+            month, day, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+            input_date = datetime(year, month, day)
+            current_year = datetime.now().year
+            
+            # Date of Birth specific validation
+            if "dob" in field_id_lower or "birth" in field_id_lower:
+                if year > current_year:
+                    return (f"Invalid date of birth: '{value_str}'. Birth year cannot be in the future. "
+                            "Please verify the year with the user.")
+                if year < 1900:
+                    return (f"Invalid date of birth: '{value_str}'. Birth year seems too old (before 1900). "
+                            "Please verify with the user.")
+                age = current_year - year
+                if age > 120:
+                    return (f"Invalid date of birth: '{value_str}'. This would make the person over 120 years old. "
+                            "Please verify the date with the user.")
+            else:
+                # General date validation
+                if year < 1900:
+                    return (f"Invalid date: '{value_str}'. Year seems too old. Please verify with the user.")
+                if year > current_year + 10:
+                    return (f"Invalid date: '{value_str}'. Year is too far in the future. Please verify with the user.")
+        except ValueError:
+            return (f"Invalid date: '{value_str}'. This is not a valid calendar date. "
+                    "Please verify with the user.")
+
+    # 7. Type Check: Checkboxes / Buttons
+    field_type = field_metadata.get('type', '')
+    if field_type == '/Btn':
+        # Checkboxes usually accept Yes/No, On/Off, True/False, or '1'/'0'
+        valid_booleans = ['yes', 'no', 'true', 'false', 'on', 'off', '1', '0']
+        if value_str.lower() not in valid_booleans:
+            return (f"Invalid value for checkbox/button '{field_id}': '{value_str}'. "
+                    f"Please provide one of: {', '.join(valid_booleans)}")
+
+    # Passed all checks
+    return None
 
 async def get_form_status(form_name: str) -> Dict[str, Any]:
     """Get current form completion status."""
@@ -214,14 +622,52 @@ def _fill_pdf_dynamic(form_name: str, form_data: dict) -> bytes:
     
     writer.clone_reader_document_root(reader)
     
-    # Create update dict directly since we stick to direct field_id mapping now
-    # Checkbox handling might need 'Yes'/'No' or '/On' check, simple string for now
+    # Enable NeedAppearances to force viewers to re-render text
+    try:
+        catalog = writer.root_object
+        if "/AcroForm" not in catalog:
+            writer.root_object.update({NameObject("/AcroForm"): DictionaryObject()})
+        
+        acroform = writer.root_object["/AcroForm"]
+        acroform.update({NameObject("/NeedAppearances"): BooleanObject(True)})
+    except Exception as e:
+        print(f"Warning: Could not set NeedAppearances: {e}")
+    
+    # Create update dict
     update_dict = {}
     for k, v in form_data.items():
         update_dict[k] = v
         
     if update_dict:
+        # Update values
         writer.update_page_form_field_values(writer.pages[0], update_dict)
+        
+        # Post-processing: Enforce auto-font size on updated fields
+        # This iterates through page annotations to find the fields we just updated
+        try:
+            for page in writer.pages:
+                if "/Annots" in page:
+                    for annot in page["/Annots"]:
+                        obj = annot.get_object()
+                        # specific logic for text fields (Tx)
+                        if obj.get("/FT") == "/Tx":
+                            # Set default appearance to auto-size (0 Tf) -> "/Helv 0 Tf 0 g"
+                            # This fixes cutoff issues by shrinking text to fit
+                            obj.update({
+                                NameObject("/DA"): TextStringObject("/Helv 0 Tf 0 g")
+                            })
+                            # Also ensure MultiLine is set if it's a long text field (bit 13)
+                            # We conserve existing flags but ensure bit 13 is set if it looks like a note
+                            flags = obj.get("/Ff", 0)
+                            if isinstance(flags, int):
+                                # If it's the "Request for good faith" field (heuristic) or long text
+                                if "circumstances" in str(obj.get("/TU", "")).lower() or len(str(form_data.get(obj.get("/T"), ""))) > 50:
+                                    flags = flags | 4096  # Set MultiLine
+                                    obj.update({
+                                        NameObject("/Ff"): NumberObject(flags)
+                                    })
+        except Exception as e:
+            print(f"Warning: Could not update field properties: {e}")
     
     output = io.BytesIO()
     writer.write(output)
@@ -256,24 +702,72 @@ async def send_form_email(
             "error": "Email not configured. Set SMTP_USER and SMTP_PASSWORD in .env"
         }
     
+    
+    # Get form info or use defaults
+    if form_name in STATIC_FORM_DESCRIPTIONS:
+        form_info = STATIC_FORM_DESCRIPTIONS[form_name]
+    else:
+        form_info = {
+            "title": f"USDA Form: {form_name}",
+            "purpose": "This form has been completed with your information for USDA program participation.",
+            "next_steps": "Please review the attached form and submit it to your local USDA Service Center."
+        }
+    
+    # Count filled fields
+    filled_count = len(form_data)
+    
+    # Get current date
+    current_date = datetime.now().strftime("%B %d, %Y")
+    
     try:
         # Fill PDF
         pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
         
-        # Create email
-        msg = MIMEMultipart()
-        msg["Subject"] = f"Your filled form: {form_name}"
+        # Create email with HTML and plain text versions
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"USDA Form Submission: {form_info['title']}"
         msg["From"] = sender_email
         msg["To"] = recipient_email
         
-        body = f"""
-Hello,
+        # Plain text version
+        plain_body = f"""
+USDA GRANTS ASSISTANT
+Form Submission Confirmation
+Date: {current_date}
 
-Please find attached your filled copy of {form_name}.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Completed via USDA Voice Assistant.
+Greetings,
+
+Thank you for using the USDA Voice Assistant to complete your form. Your submission has been processed successfully.
+
+FORM DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Form: {form_info['title']}
+Fields Completed: {filled_count}
+Date Submitted: {current_date}
+
+ABOUT THIS FORM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{form_info['purpose']}
+
+NEXT STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{form_info['next_steps']}
+
+IMPORTANT REMINDERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Review the attached PDF to ensure all information is accurate
+• Keep a copy of this form for your records
+• Contact your local USDA Service Center if you have questions
+• Find your local office at: https://www.farmers.gov/service-locator
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This form was completed using the USDA Voice Assistant.
+For questions about your submission, contact your local USDA Service Center.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(plain_body, "plain"))
         
         # Attach PDF
         pdf_attachment = MIMEApplication(pdf_bytes, _subtype="pdf")
@@ -287,23 +781,14 @@ Completed via USDA Voice Assistant.
             server.login(smtp_user, smtp_password)
             server.sendmail(sender_email, recipient_email, msg.as_string())
         
-            server.sendmail(sender_email, recipient_email, msg.as_string())
         
-        _clear_form_data(form_name)
-        
-        # Cleanup: Delete the auto-saved filled PDF
-        filled_filename = f"filled_{form_name}"
-        filled_path = DOCUMENT_DIR / filled_filename
-        if filled_path.exists():
-            try:
-                filled_path.unlink()
-            except Exception as e:
-                # Log but don't fail the user request
-                print(f"Warning: Failed to delete clean up {filled_filename}: {e}")
+        # NOTE: We intentionally do NOT clear form data here.
+        # This allows users to resend to a corrected email if needed.
+        # Form data will be cleared when the session ends or user starts a new form.
         
         return {
             "success": True,
-            "message": f"Form {form_name} sent to {recipient_email}"
+            "message": f"Form {form_name} sent to {recipient_email}. Let me know if you need to resend to a different address."
         }
         
     except Exception as e:
@@ -311,6 +796,203 @@ Completed via USDA Voice Assistant.
             "success": False,
             "error": f"Failed to send: {str(e)}"
         }
+
+
+async def send_all_forms_email(
+    recipient_email: str
+) -> Dict[str, Any]:
+    """
+    Send ALL filled forms in a single email.
+    Collects all forms that have data and sends them together.
+    """
+    # Find all forms with data
+    forms_with_data = []
+    for form_name, form_data in _FORM_DATA.items():
+        if form_data:  # Has at least one field filled
+            forms_with_data.append(form_name)
+    
+    if not forms_with_data:
+        return {
+            "success": False,
+            "error": "No forms have been filled yet."
+        }
+    
+    # Get SMTP settings
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    sender_email = os.getenv("SMTP_FROM", smtp_user)
+    
+    if not smtp_user or not smtp_password:
+        return {
+            "success": False,
+            "error": "Email not configured. Set SMTP_USER and SMTP_PASSWORD in .env"
+        }
+    
+    # Reuse the static form descriptions loaded at module start
+    # Each form entry has 'title', 'purpose', etc.
+    
+    current_date = datetime.now().strftime("%B %d, %Y")
+    
+    try:
+        # Create email
+        msg = MIMEMultipart("mixed")
+        msg["Subject"] = f"USDA Form Submission: {len(forms_with_data)} Form(s) Attached"
+        msg["From"] = sender_email
+        msg["To"] = recipient_email
+        
+        # Build form summary for the email body
+        form_summary_lines = []
+        for i, form_name in enumerate(forms_with_data, 1):
+            form_info = STATIC_FORM_DESCRIPTIONS.get(form_name, {"title": form_name, "purpose": "USDA form"})
+            fields_count = len(_FORM_DATA.get(form_name, {}))
+            form_summary_lines.append(f"{i}. {form_info['title']}\n   Fields Completed: {fields_count}\n   Purpose: {form_info['purpose']}")
+        
+        forms_summary = "\n\n".join(form_summary_lines)
+        
+        # Plain text body
+        plain_body = f"""
+USDA GRANTS ASSISTANT
+Form Submission Confirmation
+Date: {current_date}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dear Farmer,
+
+Thank you for using the USDA Voice Assistant. Your form submissions have been processed successfully.
+
+FORMS INCLUDED IN THIS EMAIL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{forms_summary}
+
+NEXT STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Review each attached PDF to ensure all information is accurate
+• Submit these forms to your local USDA Service Center
+• Keep copies of these forms for your records
+• Find your local office at: https://www.farmers.gov/service-locator
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This email was generated by the USDA Voice Assistant.
+For questions, contact your local USDA Service Center.
+
+USDA is an equal opportunity provider, employer, and lender.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+        msg.attach(MIMEText(plain_body, "plain"))
+        
+        # Attach all PDFs
+        for form_name in forms_with_data:
+            form_data = _FORM_DATA.get(form_name, {})
+            pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
+            pdf_attachment = MIMEApplication(pdf_bytes, _subtype="pdf")
+            filename = f"Filled_{form_name}"
+            pdf_attachment.add_header("Content-Disposition", "attachment", filename=filename)
+            msg.attach(pdf_attachment)
+        
+        # Send
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(sender_email, recipient_email, msg.as_string())
+        
+        return {
+            "success": True,
+            "message": f"{len(forms_with_data)} form(s) sent to {recipient_email}: {', '.join(forms_with_data)}"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to send: {str(e)}"
+        }
+
+def cleanup_session_files():
+    """
+    Clean up temporary filled form files created during the session.
+    Deletes all files matching 'filled_*.pdf' in the Document directory.
+    """
+    try:
+        if not DOCUMENT_DIR.exists():
+            return
+            
+        print(f"🧹 Cleaning up session files in {DOCUMENT_DIR}...")
+        count = 0
+        for file_path in DOCUMENT_DIR.glob("filled_*.pdf"):
+            try:
+                file_path.unlink()
+                count += 1
+                print(f"   Deleted: {file_path.name}")
+            except Exception as e:
+                print(f"   Failed to delete {file_path.name}: {e}")
+        
+        if count > 0:
+            print(f"✓ Removed {count} temporary form file(s)")
+        else:
+            print("   No temporary files found to clean up")
+            
+    except Exception as e:
+        print(f"⚠️ Error during file cleanup: {e}")
+
+# --- UI Panel Support ---
+
+def get_pending_form_updates() -> list:
+    """
+    Get and clear pending form updates for broadcasting to UI.
+    Called after each LLM response to send updates to the frontend.
+    """
+    global _PENDING_UPDATES
+    updates = _PENDING_UPDATES.copy()
+    _PENDING_UPDATES = []
+    return updates
+
+async def update_form_field_from_ui(
+    form_name: str,
+    field_id: str,
+    value: str
+) -> Dict[str, Any]:
+    """
+    Update a form field from the UI panel (manual edit).
+    Does NOT queue an update back to UI (to avoid loops).
+    """
+    schema = _get_form_schema(form_name)
+    if "error" in schema:
+        return {"success": False, "error": schema["error"]}
+
+    if field_id not in schema:
+        return {
+            "success": False,
+            "error": f"Invalid field_id '{field_id}'."
+        }
+
+    form_data = _get_form_data(form_name)
+    form_data[field_id] = value
+    
+    # Auto-save the PDF
+    try:
+        pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
+        output_path = DOCUMENT_DIR / f"filled_{form_name}"
+        with open(output_path, "wb") as f:
+            f.write(pdf_bytes)
+    except Exception:
+        pass  # Silently fail auto-save for UI edits
+    
+    return {"success": True, "field_id": field_id, "value": value}
+
+def get_current_form_state() -> Dict[str, Any]:
+    """Get current form state for initial panel load."""
+    global _ACTIVE_FORM
+    if not _ACTIVE_FORM:
+        return {"active": False}
+    
+    form_data = _get_form_data(_ACTIVE_FORM)
+    return {
+        "active": True,
+        "form_name": _ACTIVE_FORM,
+        "fields": dict(form_data)
+    }
 
 # --- Tool Definitions ---
 
@@ -389,7 +1071,7 @@ SEND_FORM_EMAIL_TOOL = {
     "type": "function",
     "function": {
         "name": "send_form_email",
-        "description": "Fill the PDF and email it.",
+        "description": "Fill a single PDF form and email it to the customer.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -407,12 +1089,50 @@ SEND_FORM_EMAIL_TOOL = {
     }
 }
 
+SEND_ALL_FORMS_EMAIL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "send_all_forms_email",
+        "description": "Send ALL filled forms in a single email. Use this when user wants to receive multiple forms together instead of separately.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "recipient_email": {
+                    "type": "string",
+                    "description": "Customer's email address"
+                }
+            },
+            "required": ["recipient_email"]
+        }
+    }
+}
+
+GET_FORM_SUMMARY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_form_summary",
+        "description": "Get a summary of the form (field count, estimated time) to present to the user BEFORE starting.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "form_name": {
+                    "type": "string",
+                    "description": "Name of the form file"
+                }
+            },
+            "required": ["form_name"]
+        }
+    }
+}
+
 FORM_TOOLS = [
     LIST_FORMS_TOOL,
     GET_FORM_FIELDS_TOOL,
     FILL_FORM_FIELD_TOOL,
     GET_FORM_STATUS_TOOL,
-    SEND_FORM_EMAIL_TOOL
+    SEND_FORM_EMAIL_TOOL,
+    SEND_ALL_FORMS_EMAIL_TOOL,
+    GET_FORM_SUMMARY_TOOL
 ]
 
 FORM_TOOL_FUNCTIONS = {
@@ -420,5 +1140,7 @@ FORM_TOOL_FUNCTIONS = {
     "get_form_fields": get_form_fields,
     "fill_form_field": fill_form_field,
     "get_form_status": get_form_status,
-    "send_form_email": send_form_email
+    "send_form_email": send_form_email,
+    "send_all_forms_email": send_all_forms_email,
+    "get_form_summary": get_form_summary
 }

@@ -11,14 +11,16 @@ class TTSStream:
     
     def __init__(self):
         self.audio_queue = asyncio.Queue()
+        self._synthesizer = None
+        self._synthesizer_lock = asyncio.Lock()
+        self._warmup_done = False
         self._init_azure()
     
     def _init_azure(self):
-        """Initialize Azure Speech TTS"""
+        """Initialize Azure Speech TTS with connection pooling."""
         if not config.AZURE_SPEECH_KEY or not config.AZURE_SPEECH_REGION:
-            raise ValueError("AZURE_SPEECH_KEY and AZURE_SPEECH_REGION must be set for Azure Speech")
+            raise ValueError("AZURE_SPEECH_KEY and AZURE_SPEECH_REGION must be set")
         
-        # Create speech config
         if config.AZURE_SPEECH_ENDPOINT:
             self.speech_config = speechsdk.SpeechConfig(
                 endpoint=config.AZURE_SPEECH_ENDPOINT,
@@ -30,71 +32,71 @@ class TTSStream:
                 region=config.AZURE_SPEECH_REGION
             )
         
-        # Set voice
         self.speech_config.speech_synthesis_voice_name = config.AZURE_SPEECH_VOICE
+        self.speech_config.set_speech_synthesis_output_format(
+            speechsdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm
+        )
+        self._synthesizer = speechsdk.SpeechSynthesizer(
+            speech_config=self.speech_config, audio_config=None
+        )
+    
+    async def warmup(self):
+        """Warm up the TTS connection to reduce first-response latency"""
+        if self._warmup_done:
+            return
         
-        # No audio_config needed - we'll use None to get audio data directly
-        # When audio_config=None, the synthesizer returns audio data instead of playing
+        try:
+            # Synthesize a minimal phrase to warm up the connection
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: self._synthesizer.speak_text_async(" ").get()
+            )
+            self._warmup_done = True
+            if config.DEBUG:
+                print("✓ TTS connection warmed up")
+        except Exception as e:
+            if config.DEBUG:
+                print(f"⚠️ TTS warmup failed: {e}")
     
     async def synthesize(self, text: str) -> bytes:
-        """Convert text to speech audio"""
-        # Validate input - never synthesize None or empty text
-        if text is None:
-            print("⚠️ TTS: Received None text, skipping synthesis")
-            return b""
-        
-        if not isinstance(text, str):
-            print(f"⚠️ TTS: Received non-string text ({type(text)}), converting to string")
-            text = str(text)
-        
+        """Convert text to speech audio. Returns empty bytes for invalid input."""
+        if not text or not isinstance(text, str):
+            if text is not None and not isinstance(text, str):
+                text = str(text)
+            else:
+                return b""
         text = text.strip()
-        if not text:
-            print("⚠️ TTS: Received empty text, skipping synthesis")
-            return b""
-        
-        return await self._synthesize_azure(text)
+        return await self._synthesize_azure(text) if text else b""
     
     async def _synthesize_azure(self, text: str) -> bytes:
-        """Convert text to speech using Azure Speech"""
+        """Convert text to speech using pooled Azure connection."""
         try:
             if config.VERBOSE:
-                print(f"🔊 Synthesizing with Azure Speech: {text[:50]}...")
+                print(f"🔊 Synthesizing: {text[:50]}...")
             
-            # Create synthesizer (no audio config = returns audio data)
-            synthesizer = speechsdk.SpeechSynthesizer(
-                speech_config=self.speech_config,
-                audio_config=None  # None = return audio data instead of playing
-            )
-            
-            # Run synthesis in executor to avoid blocking
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: synthesizer.speak_text_async(text).get()
-            )
+            async with self._synthesizer_lock:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    None, lambda: self._synthesizer.speak_text_async(text).get()
+                )
             
             if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-                # Get audio data from result
                 audio_bytes = bytes(result.audio_data)
-                
                 if config.DEBUG:
-                    print(f"✓ Azure TTS generated {len(audio_bytes)} bytes")
-                
+                    print(f"✓ TTS generated {len(audio_bytes)} bytes")
                 return audio_bytes
-            elif result.reason == speechsdk.ResultReason.Canceled:
-                cancellation = speechsdk.CancellationDetails(result)
-                print(f"❌ Azure TTS canceled: {cancellation.reason}")
-                if cancellation.reason == speechsdk.CancellationReason.Error:
-                    print(f"   Error details: {cancellation.error_details}")
-                return b""
-            else:
-                print(f"❌ Azure TTS failed: {result.reason}")
-                return b""
             
+            if result.reason == speechsdk.ResultReason.Canceled:
+                cancellation = speechsdk.CancellationDetails(result)
+                print(f"❌ TTS canceled: {cancellation.reason}")
+                if cancellation.reason == speechsdk.CancellationReason.Error:
+                    print(f"   Error: {cancellation.error_details}")
+            else:
+                print(f"❌ TTS failed: {result.reason}")
+            return b""
         except Exception as e:
-            print(f"❌ Azure TTS error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ TTS error: {e}")
             return b""
     
     async def synthesize_stream(self, text: str, chunk_callback):

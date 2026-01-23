@@ -1,0 +1,55 @@
+{
+    "AD-2100.pdf": {
+        "title": "AD-2100: Request for Information or Documentation",
+        "purpose": "Request for additional information/documentation from program participants.",
+        "next_steps": "Submit to your local USDA Service Center.",
+        "field_count": 17,
+        "estimated_time": "8 minutes",
+        "categories": {
+            "Dates": 6,
+            "General Information": 7,
+            "Contact Information": 4
+        }
+    },
+    "AD-3117.pdf": {
+        "title": "AD-3117: Conservation Program Application",
+        "purpose": "Application for USDA conservation programs (CSP, EQIP, etc.).",
+        "next_steps": "Submit to NRCS office. Site visit may be required.",
+        "field_count": 64,
+        "estimated_time": "32 minutes",
+        "categories": {
+            "General Information": 18,
+            "Contact Information": 7,
+            "Dates": 10,
+            "Farm Details": 29
+        }
+    },
+    "AD1069.pdf": {
+        "title": "AD-1069: Request for Good Faith Relief",
+        "purpose": "Application for relief from Wetland Conservation (WC) violations (Part A only).",
+        "next_steps": "Complete Part A and submit to your local FSA office. NRCS will complete Part B.",
+        "field_count": 8,
+        "estimated_time": "4 minutes",
+        "categories": {
+            "Contact Information": 2,
+            "Identification": 1,
+            "Farm Details": 2,
+            "General Information": 2,
+            "Dates": 1
+        }
+    },
+    "BCAP-1.pdf": {
+        "title": "BCAP-1: Biomass Crop Assistance Program Application",
+        "purpose": "Application for Biomass Crop Assistance Program.",
+        "next_steps": "Submit to FSA office with land eligibility docs.",
+        "field_count": 337,
+        "estimated_time": "168 minutes",
+        "categories": {
+            "General Information": 97,
+            "Contact Information": 34,
+            "Dates": 68,
+            "Identification": 2,
+            "Farm Details": 136
+        }
+    }
+}

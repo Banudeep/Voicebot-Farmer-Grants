@@ -1,66 +1,60 @@
 """
-Configuration file for Voice Agent
-Stores API keys, settings, and thresholds
+Configuration for USDA Voice Agent - loads from environment variables.
 """
 import os
 import yaml
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Azure OpenAI Settings (required)
+# --- Azure OpenAI (Required) ---
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-# Strip quotes and whitespace from deployment name (common issue in Cloud Run)
-_deployment_raw = os.getenv("AZURE_OPENAI_DEPLOYMENT")
-AZURE_OPENAI_DEPLOYMENT = _deployment_raw.strip('"\'') if _deployment_raw else None
 AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2025-04-01-preview")
+_deployment_raw = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+AZURE_OPENAI_DEPLOYMENT = _deployment_raw.strip("\"'") if _deployment_raw else None
 
-# Azure Speech Services Settings (required for STT and TTS)
+# --- Azure Speech Services (Required for STT/TTS) ---
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
-AZURE_SPEECH_ENDPOINT = os.getenv("AZURE_SPEECH_ENDPOINT")  # Optional, auto-constructed if not provided
+AZURE_SPEECH_ENDPOINT = os.getenv("AZURE_SPEECH_ENDPOINT")
 AZURE_SPEECH_LANGUAGE = os.getenv("AZURE_SPEECH_LANGUAGE", "en-US")
-AZURE_SPEECH_VOICE = os.getenv("AZURE_SPEECH_VOICE", "en-US-JennyNeural")  # TTS voice
+AZURE_SPEECH_VOICE = os.getenv("AZURE_SPEECH_VOICE", "en-US-JennyNeural")
 
-# LLM Settings
+# --- LLM Settings ---
 OPENAI_TEMPERATURE = 1
-OPENAI_MAX_TOKENS = 300  # Reduced from 500 for faster responses
+OPENAI_MAX_TOKENS = 300
 
-# Azure Speech STT Settings
-STT_SAMPLE_RATE = 16000  # 16kHz for Azure Speech
+# --- Audio Settings ---
+STT_SAMPLE_RATE = 16000
 STT_CHANNELS = 1
-STT_FORMAT = "PCM"  # PCM format
 
-# Azure Speech TTS Settings
-TTS_SAMPLE_RATE = 24000  # 24kHz for Azure TTS (standard)
-TTS_FORMAT = "audio-16khz-128kbitrate-mono-mp3"  # or "raw-16khz-16bit-mono-pcm"
+# --- Speech Detection ---
+END_OF_SPEECH_TIMEOUT = 3
 
-# Audio Settings
-CHUNK_SIZE = 8192
-AUDIO_FORMAT = "int16"
+# --- Conversation Settings ---
+MAX_CONVERSATION_HISTORY = 60
+ENABLE_TOOLS = True
+ENABLE_USDA_TOOLS = os.getenv("ENABLE_USDA_TOOLS", "true").lower() == "true"
+ENABLE_NASS_TOOLS = os.getenv("ENABLE_NASS_TOOLS", "true").lower() == "true"
+ENABLE_FARMERS_GRANTS_TOOLS = os.getenv("ENABLE_FARMERS_GRANTS_TOOLS", "true").lower() == "true"
 
-# Voice Activity Detection
-VAD_THRESHOLD = 0.005  # Voice activity threshold (0-1) - Lowered for better sensitivity
-SILENCE_DURATION = 1.0  # Reduced from 1.5 for faster end-of-speech detection
-MIN_SPEECH_DURATION = 0.3  # Minimum speech duration in seconds
-END_OF_SPEECH_TIMEOUT = 0.5  # Reduced from 0.8 for faster processing
+# --- Recording & Debug ---
+ENABLE_RECORDINGS = os.getenv("ENABLE_RECORDINGS", "false").lower() == "true"
+DEBUG = False
+VERBOSE = False
 
-# Conversation Settings
-# Load system prompt from YAML file if available
-# Load system prompt from YAML file if available
-# Check for prompts directory in current dir (src) or parent dir (root)
+# --- System Prompt ---
 _current_dir = Path(__file__).parent
 PROMPTS_DIR = _current_dir / "prompts"
 if not PROMPTS_DIR.exists():
     PROMPTS_DIR = _current_dir.parent / "prompts"
-
 USDA_PROMPT_FILE = PROMPTS_DIR / "USDA.yml"
 
+
 def load_system_prompt():
-    """Load system prompt from YAML file, fallback to default"""
+    """Load system prompt from YAML file, fallback to default."""
     if USDA_PROMPT_FILE.exists():
         try:
             with open(USDA_PROMPT_FILE, 'r', encoding='utf-8') as f:
@@ -76,31 +70,15 @@ def load_system_prompt():
 for voice conversation, ideally 1-3 sentences unless more detail is specifically requested. 
 Speak in a friendly, conversational tone."""
 
+
 SYSTEM_PROMPT = load_system_prompt()
 
-MAX_CONVERSATION_HISTORY = 60  # Increased from 20 to prevent context loss during long form filling sessions
-ENABLE_TOOLS = True  # Enable MCP tools
 
-# Tool Enablement Flags
-ENABLE_USDA_TOOLS = os.getenv("ENABLE_USDA_TOOLS", "true").lower() == "true"
-ENABLE_NASS_TOOLS = os.getenv("ENABLE_NASS_TOOLS", "true").lower() == "true"
-ENABLE_FARMERS_GRANTS_TOOLS = os.getenv("ENABLE_FARMERS_GRANTS_TOOLS", "true").lower() == "true"
-
-# Performance Settings
-STT_BUFFER_SIZE = 4096
-TTS_BUFFER_SIZE = 8192
-AUDIO_QUEUE_MAXSIZE = 500  # Increased from 100 to handle more audio
-
-# Recording Settings
-ENABLE_RECORDINGS = os.getenv("ENABLE_RECORDINGS", "false").lower() == "true"
-
-# Debug Settings
-DEBUG = False
-VERBOSE = False  # Disable verbose to reduce spam (VAD working now)
-
-# Validate API keys
+# =============================================================================
+# Configuration Validation
+# =============================================================================
 def validate_config():
-    """Validate that required API keys are set"""
+    """Validate that required API keys are set."""
     errors = []
     
     # Azure OpenAI is required
@@ -122,6 +100,7 @@ def validate_config():
     
     if VERBOSE:
         print("✓ Configuration validated")
+
 
 if __name__ == "__main__":
     validate_config()

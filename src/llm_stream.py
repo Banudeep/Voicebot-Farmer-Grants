@@ -4,6 +4,7 @@ Streaming text generation using Azure OpenAI Responses API
 """
 import asyncio
 import json
+import random
 from pathlib import Path
 import config
 
@@ -80,6 +81,14 @@ class LLMStream:
                 tool_names = [t.get('function', {}).get('name', t.get('name', 'unknown')) for t in self.all_tools]
                 logger.debug(f"Available tools: {', '.join(tool_names)}")
     
+    def clear_history(self):
+        """Clear the conversation conversation_history"""
+        self.conversation_history = []
+        # Clear reasoning chain if using Responses API
+        self.reasoning_id = None
+        if config.DEBUG:
+            logger.info("LLM history usage cleared")
+    
     async def _get_tools(self):
         """Get available tools in OpenAI format"""
         if not config.ENABLE_TOOLS:
@@ -93,13 +102,9 @@ class LLMStream:
         
         formatted_tools = []
         for tool in tools:
-            # Check if already in Azure format (has 'function' key)
             if "function" in tool:
                 formatted_tools.append(tool)
             else:
-                # Convert from OpenAI format to Azure format
-                # OpenAI format: {type: "function", name: "...", description: "...", parameters: {...}}
-                # Azure format: {type: "function", function: {name: "...", description: "...", parameters: {...}}}
                 formatted_tool = {
                     "type": tool.get("type", "function"),
                     "function": {
@@ -111,6 +116,130 @@ class LLMStream:
                 formatted_tools.append(formatted_tool)
         
         return formatted_tools
+    
+    def _format_tools_for_responses_api(self, tools):
+        """Convert tools to Responses API flat format."""
+        if not tools:
+            return []
+        formatted = []
+        for tool in tools:
+            if "function" in tool:
+                func = tool["function"]
+                formatted.append({
+                    "type": "function",
+                    "name": func.get("name", ""),
+                    "description": func.get("description", ""),
+                    "parameters": func.get("parameters", {})
+                })
+            else:
+                formatted.append({
+                    "type": tool.get("type", "function"),
+                    "name": tool.get("name", ""),
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("parameters", {})
+                })
+        return formatted
+    
+    def _get_filler_phrase(self, tool_name: str) -> str:
+        """Get a random filler phrase appropriate for the tool being called.
+        Returns varied phrases to sound natural, including simple acknowledgements.
+        """
+        # Tool-specific filler phrases (randomized)
+        tool_fillers = {
+            # Price tools
+            'get_corn_soybean_prices': [
+                "Checking current prices...",
+                "Let me look up those prices.",
+                "One moment, pulling up prices.",
+                "Okay, checking the market data.",
+            ],
+            'find_state_reports': [
+                "Looking up state data...",
+                "Let me find that report.",
+                "Checking state information.",
+            ],
+            # Grant/program tools
+            'search_agriculture_grants': [
+                "Searching available grants...",
+                "Let me find some grants for you.",
+                "Looking through grant programs.",
+            ],
+            'search_grants': [
+                "Searching grants...",
+                "Looking into that for you.",
+                "Let me check what's available.",
+            ],
+            'search_all_programs': [
+                "Searching all programs...",
+                "Let me look through the programs.",
+                "Checking available programs.",
+            ],
+            'search_farmers_grants': [
+                "Looking up farmer programs...",
+                "Searching farmer assistance.",
+            ],
+            'get_grant_details': [
+                "Getting those details...",
+                "Let me pull up that information.",
+                "One moment.",
+            ],
+            # Stats tools
+            'nass_api_get': [
+                "Looking up USDA statistics...",
+                "Checking the data...",
+                "Let me get those numbers.",
+            ],
+            # Form tools
+            'fill_form_field': [
+                "Got it.",
+                "Okay.",
+                "Saving that.",
+                "Noted.",
+            ],
+            'send_form_email': [
+                "Sending your form now...",
+                "Let me send that off.",
+                "Submitting that for you.",
+            ],
+            'get_form_fields': [
+                "Let me get the form ready.",
+                "Pulling up the form.",
+            ],
+            'list_available_forms': [
+                "Checking available forms...",
+                "Let me see what forms we have.",
+            ],
+            # Service center / contact tools
+            'search_service_center': [
+                "Finding your local office...",
+                "Looking up service centers.",
+                "Let me find that for you.",
+            ],
+            # News tools
+            'search_state_news': [
+                "Checking recent news...",
+                "Looking up updates.",
+            ],
+            # Deadline tools
+            'get_state_ranking_dates': [
+                "Checking deadlines...",
+                "Looking up those dates.",
+            ],
+        }
+        
+        # Default fillers for unknown tools
+        default_fillers = [
+            "Let me check on that...",
+            "One moment...",
+            "Looking into that.",
+            "Okay, let me see.",
+            "Sure, checking now.",
+            "Got it, one second.",
+        ]
+        
+        # Get tool-specific or default fillers
+        fillers = tool_fillers.get(tool_name, default_fillers)
+        return random.choice(fillers)
     
     async def _execute_tool(self, tool_name: str, arguments: dict) -> str:
         """Execute a tool function directly"""
@@ -177,8 +306,14 @@ class LLMStream:
                 logger.exception("Tool execution traceback")
             return json.dumps({"error": error_msg, "arguments": arguments})
     
-    async def _azure_responses_api(self, messages, tools, stream_callback):
+    async def _azure_responses_api(self, messages, tools, stream_callback, filler_callback=None):
         """Use Azure OpenAI Responses API (recommended for GPT-5 class models)
+        
+        Args:
+            messages: Conversation messages
+            tools: Available tools
+            stream_callback: Callback for streaming text (currently unused)
+            filler_callback: Async callback to send filler audio before tool execution
         
         Benefits over Chat Completions:
         - Chain-of-thought (CoT) support for better reasoning
@@ -247,28 +382,9 @@ class LLMStream:
         if self.reasoning_id:
             payload["reasoning"] = {"id": self.reasoning_id}
         
-        # Add tools if available (Responses API uses flat format, not nested under 'function')
+        # Add tools if available
         if tools:
-            formatted_tools = []
-            for tool in tools:
-                if "function" in tool:
-                    # Convert from Chat Completions format to Responses API format
-                    func = tool["function"]
-                    formatted_tools.append({
-                        "type": "function",
-                        "name": func.get("name", ""),
-                        "description": func.get("description", ""),
-                        "parameters": func.get("parameters", {})
-                    })
-                else:
-                    # Already in flat format or use as-is
-                    formatted_tools.append({
-                        "type": tool.get("type", "function"),
-                        "name": tool.get("name", ""),
-                        "description": tool.get("description", ""),
-                        "parameters": tool.get("parameters", {})
-                    })
-            payload["tools"] = formatted_tools
+            payload["tools"] = self._format_tools_for_responses_api(tools)
         
         if config.DEBUG:
             logger.debug(f"Responses API URL: {url}")
@@ -348,6 +464,14 @@ class LLMStream:
                         tool_name = tc["function"]["name"]
                         tool_args = json.loads(tc["function"]["arguments"])
                         
+                        # Send filler audio BEFORE tool execution for instant feedback
+                        if filler_callback:
+                            filler_phrase = self._get_filler_phrase(tool_name)
+                            try:
+                                await filler_callback(filler_phrase)
+                            except Exception as e:
+                                logger.warning(f"Filler callback failed: {e}")
+                        
                         if config.DEBUG:
                             logger.debug(f"Executing tool: {tool_name} with args: {tool_args}")
                         
@@ -385,25 +509,7 @@ class LLMStream:
                         next_payload["reasoning"] = {"id": self.reasoning_id}
                     
                     if tools:
-                        # Format tools for Responses API (flat format)
-                        formatted_tools = []
-                        for tool in tools:
-                            if "function" in tool:
-                                func = tool["function"]
-                                formatted_tools.append({
-                                    "type": "function",
-                                    "name": func.get("name", ""),
-                                    "description": func.get("description", ""),
-                                    "parameters": func.get("parameters", {})
-                                })
-                            else:
-                                formatted_tools.append({
-                                    "type": tool.get("type", "function"),
-                                    "name": tool.get("name", ""),
-                                    "description": tool.get("description", ""),
-                                    "parameters": tool.get("parameters", {})
-                                })
-                        next_payload["tools"] = formatted_tools
+                        next_payload["tools"] = self._format_tools_for_responses_api(tools)
                     
                     next_response = await client.post(url, headers=headers, json=next_payload)
                     next_response.raise_for_status()
@@ -467,8 +573,14 @@ class LLMStream:
                 logger.debug(f"Request URL: {url}")
                 raise
     
-    async def generate_response(self, user_message: str, stream_callback=None):
-        """Generate response with optional streaming"""
+    async def generate_response(self, user_message: str, stream_callback=None, filler_callback=None):
+        """Generate response with optional streaming and filler audio
+        
+        Args:
+            user_message: The user's message
+            stream_callback: Callback for streaming text
+            filler_callback: Async callback to send filler audio before tool execution
+        """
         # Add user message to history
         self.conversation_history.append({
             "role": "user",
@@ -492,7 +604,7 @@ class LLMStream:
             # Use Responses API (httpx required)
             if not HAS_HTTPX:
                 raise RuntimeError("httpx is required for Azure OpenAI. Install with: pip install httpx")
-            return await self._azure_responses_api(messages, tools, stream_callback)
+            return await self._azure_responses_api(messages, tools, stream_callback, filler_callback)
                 
         except Exception as e:
             error_msg = str(e)
@@ -535,12 +647,14 @@ class LLMStream:
             
             return "I encountered an error. Please try asking your question again."
     
-    async def generate_response_streaming(self, user_message: str):
+    async def generate_response_streaming(self, user_message: str, filler_callback=None):
         """
         Generate response with sentence-level streaming for faster TTS.
         
-        Yields sentences as they're ready, allowing TTS to start immediately
-        on the first sentence while LLM continues generating.
+        Args:
+            user_message: The user's message
+            filler_callback: Async callback to send filler audio before tool execution.
+                           Called with filler phrase text, should synthesize and play audio.
         
         Yields:
             tuple: (sentence: str, is_final: bool)
@@ -570,7 +684,8 @@ class LLMStream:
             
             # Get full response (Azure Responses API doesn't support streaming yet)
             # But we can split it into sentences for incremental TTS
-            full_response = await self._azure_responses_api(messages, tools, None)
+            # Pass filler_callback for instant audio feedback during tool execution
+            full_response = await self._azure_responses_api(messages, tools, None, filler_callback)
             
             if not full_response or not isinstance(full_response, str):
                 yield ("I'm sorry, I couldn't generate a response.", True)

@@ -14,9 +14,21 @@ class STTStream:
         self.transcript_queue = asyncio.Queue()
         self.is_connected = False
         self._last_transcript = None
-        self._event_loop = None  # Store event loop for Azure callbacks
-        
+        self._event_loop = None
         self._init_azure()
+    
+    def _queue_result(self, result: dict):
+        """Queue a transcript result from Azure callback thread."""
+        loop = self._event_loop if self._event_loop and self._event_loop.is_running() else None
+        if not loop:
+            try:
+                loop = asyncio.get_event_loop()
+                if not loop.is_running():
+                    loop = None
+            except RuntimeError:
+                loop = None
+        if loop:
+            asyncio.run_coroutine_threadsafe(self.transcript_queue.put(result), loop)
     
     def _init_azure(self):
         """Initialize Azure Speech client"""
@@ -75,11 +87,18 @@ class STTStream:
             self.recognizer.session_stopped.connect(self._on_azure_session_stopped)
             self.recognizer.canceled.connect(self._on_azure_canceled)
             
-            # Configure recognition settings for faster response
+            # Configure recognition settings for faster response and semantic endpointing
+            # Enable Semantic Segmentation (Endpointing) - helps prevent cutting off during pauses
+            # Requires SDK 1.41.0+
+            self.speech_config.set_property(
+                speechsdk.PropertyId.Speech_SegmentationStrategy, 
+                "Semantic"
+            )
+            
             # Set property to return interim results more frequently
             self.speech_config.set_property(
                 speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, 
-                "500"  # 500ms silence timeout (faster than default)
+                "800"  # Increased from 500ms to 1000ms to allow semantic model to work better
             )
             
             # Start continuous recognition
@@ -96,60 +115,25 @@ class STTStream:
             return False
     
     def _on_azure_recognizing(self, evt):
-        """Handle Azure Speech interim recognition results (faster, partial transcripts)"""
+        """Handle interim recognition results (partial transcripts)."""
         try:
             if evt.result.reason == speechsdk.ResultReason.RecognizingSpeech:
                 transcript = evt.result.text.strip()
                 if transcript:
-                    # Send interim results immediately
-                    # These are partial/refined results that update as you speak
-                    if self._event_loop and self._event_loop.is_running():
-                        asyncio.run_coroutine_threadsafe(
-                            self.transcript_queue.put(transcript),
-                            self._event_loop
-                        )
-                    else:
-                        try:
-                            loop = asyncio.get_event_loop()
-                            if loop.is_running():
-                                asyncio.run_coroutine_threadsafe(
-                                    self.transcript_queue.put(transcript),
-                                    loop
-                                )
-                        except RuntimeError:
-                            pass
+                    self._queue_result({"text": transcript, "is_final": False})
         except Exception as e:
             if config.DEBUG:
                 print(f"⚠️ Azure Speech interim result error: {e}")
     
     def _on_azure_recognized(self, evt):
-        """Handle Azure Speech final recognition result (after silence detected)"""
+        """Handle final recognition result (after silence detected)."""
         try:
             if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
                 transcript = evt.result.text.strip()
                 if transcript and transcript != self._last_transcript:
                     self._last_transcript = transcript
-                    print(f"\n✅ 📝 TRANSCRIPT: {transcript}")
-                    
-                    # Azure callbacks run in a different thread, so we need to use
-                    # run_coroutine_threadsafe to schedule the async operation
-                    if self._event_loop and self._event_loop.is_running():
-                        asyncio.run_coroutine_threadsafe(
-                            self.transcript_queue.put(transcript),
-                            self._event_loop
-                        )
-                    else:
-                        # Fallback: try to get current loop
-                        try:
-                            loop = asyncio.get_event_loop()
-                            if loop.is_running():
-                                asyncio.run_coroutine_threadsafe(
-                                    self.transcript_queue.put(transcript),
-                                    loop
-                                )
-                        except RuntimeError:
-                            # No event loop available - this shouldn't happen but handle gracefully
-                            print("⚠️ No event loop available for Azure Speech callback")
+                    print(f"\n✅ 📝 TRANSCRIPT (FINAL): {transcript}")
+                    self._queue_result({"text": transcript, "is_final": True})
             elif evt.result.reason == speechsdk.ResultReason.NoMatch:
                 if config.VERBOSE:
                     print("⚠️ Azure Speech: No speech could be recognized")
@@ -220,11 +204,11 @@ async def test_stt():
     print("Say something...")
     
     try:
-        transcript = await asyncio.wait_for(
+        result = await asyncio.wait_for(
             stt.get_transcript(),
             timeout=10.0
         )
-        print(f"✓ Received: {transcript}")
+        print(f"✓ Received: {result}")
     except asyncio.TimeoutError:
         print("⚠️ No speech detected")
     

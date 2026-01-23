@@ -44,9 +44,9 @@ WORKDIR /app
 # Copy application files
 COPY . .
 
-# Create recordings directory
+# Create recordings directory and ensure ownership of all files
 RUN mkdir -p recordings && \
-    chown -R appuser:appuser recordings
+    chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
