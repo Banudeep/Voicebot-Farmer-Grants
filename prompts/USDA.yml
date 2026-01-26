@@ -87,4 +87,3 @@ system: >
 user_prefix: "User:"
 assistant_prefix: "Assistant:"
 max_sentences: 4
-

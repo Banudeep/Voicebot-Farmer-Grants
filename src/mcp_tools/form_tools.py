@@ -45,7 +45,14 @@ _PENDING_UPDATES = []
 
 # Track active form session for auto-open/close
 _ACTIVE_FORM = None
+# Track current session ID for email reference
+_CURRENT_SESSION_ID = None
 
+def set_session_id(session_id: str):
+    """Set the current session ID for reference in emails."""
+    global _CURRENT_SESSION_ID
+    _CURRENT_SESSION_ID = session_id
+    
 def _load_static_descriptions():
     """Load pre-calculated form metadata from scraper output."""
     try:
@@ -723,6 +730,36 @@ async def send_form_email(
         # Fill PDF
         pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
         
+        # Try to find farmer's name for greeting
+        farmer_name = None
+        name_keywords = ['name', 'producer', 'applicant', 'contact']
+        
+        # Get schema to check field descriptions (semantic search)
+        schema = _get_form_schema(form_name)
+        
+        # Look for a field that contains one of the keywords and has a value
+        for key, value in form_data.items():
+            if not value or len(str(value)) < 3:
+                continue
+                
+            # Skip if value is a date or number
+            if any(char.isdigit() for char in str(value)):
+                continue
+            
+            # Check Field ID
+            if any(k in key.lower() for k in name_keywords):
+                farmer_name = str(value).title()
+                break
+            
+            # Check Field Description (Semantic)
+            if isinstance(schema, dict) and key in schema:
+                description = schema[key].get('description', '').lower()
+                if any(k in description for k in name_keywords):
+                    farmer_name = str(value).title()
+                    break
+        
+        greeting = f"Greetings {farmer_name}," if farmer_name else "Greetings,"
+
         # Create email with HTML and plain text versions
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"USDA Form Submission: {form_info['title']}"
@@ -737,7 +774,7 @@ Date: {current_date}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Greetings,
+{greeting}
 
 Thank you for using the USDA Voice Assistant to complete your form. Your submission has been processed successfully.
 
@@ -746,6 +783,7 @@ FORM DETAILS
 Form: {form_info['title']}
 Fields Completed: {filled_count}
 Date Submitted: {current_date}
+Session ID: {_CURRENT_SESSION_ID or 'Not available'}
 
 ABOUT THIS FORM
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

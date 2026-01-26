@@ -7,6 +7,7 @@ import json
 import base64
 import wave
 import struct
+import uuid
 from datetime import datetime
 from pathlib import Path
 from aiohttp import web
@@ -16,6 +17,7 @@ from websockets.exceptions import ConnectionClosed
 from llm_stream import LLMStream
 from stt_stream import STTStream
 from tts_stream import TTSStream
+from blob_storage import get_blob_logger
 from mcp_tools.form_tools import get_active_form_state, cleanup_session_files
 import config
 
@@ -38,12 +40,12 @@ class WebVoiceAgent:
         self.processed_texts = []  # Track ALL processed texts to strip from cumulative transcripts
         # Audio recording storage: map websocket to list of audio chunks
         self.audio_recordings = {}
-        # Create recordings directory only if recordings are enabled
-        if config.ENABLE_RECORDINGS:
-            self.recordings_dir = Path(__file__).parent / "recordings"
-            self.recordings_dir.mkdir(exist_ok=True)
-        else:
-            self.recordings_dir = None
+        # Session tracking for blob logging: {websocket: {session_id, started_at, messages}}
+        self.session_data = {}
+        # Track users who opted out of recording
+        self.recording_opt_out = set()
+        # Blob storage logger (singleton)
+        self.blob_logger = get_blob_logger()
     
     def _is_late_transcript(self, current_time: float) -> bool:
         """Check if a transcript arrived too late (after we already started processing)"""
@@ -91,6 +93,34 @@ class WebVoiceAgent:
         self.last_processed_time = 0
         self.llm.clear_history()
         print("🔄 Session reset - cleared processed text history and LLM context")
+    
+    async def _upload_session_data(self, websocket):
+        """Upload session transcript and recording to blob storage on disconnect"""
+        session = self.session_data.get(websocket)
+        if not session:
+            return
+        
+        session_id = session['session_id']
+        started_at = session['started_at']
+        ended_at = datetime.now()
+        messages = session['messages']
+        
+        # Upload transcript
+        if messages:
+            await self.blob_logger.upload_transcript(
+                session_id=session_id,
+                messages=messages,
+                started_at=started_at,
+                ended_at=ended_at
+            )
+        
+        # Upload recording (if audio was collected)
+        audio_chunks = self.audio_recordings.get(websocket, [])
+        if audio_chunks:
+            await self.blob_logger.upload_recording(
+                session_id=session_id,
+                audio_chunks=audio_chunks
+            )
     
     async def _process_complete_speech(self, complete_text: str, trigger_type: str):
         """Process complete speech through LLM. Used by both semantic and timeout triggers."""
@@ -189,6 +219,26 @@ class WebVoiceAgent:
         self.active_connections.add(websocket)
         print(f"  Active connections: {len(self.active_connections)}")
         
+        # Initialize session tracking immediately upon connection
+        session_id = str(uuid.uuid4())[:8]
+        
+        # Pass session ID to form tools for email reference
+        try:
+            from mcp_tools.form_tools import set_session_id
+            set_session_id(session_id)
+        except ImportError:
+            pass
+            
+        self.session_data[websocket] = {
+            'session_id': session_id,
+            'started_at': datetime.now(),
+            'messages': []
+        }
+        print(f"📝 Session initialized: {session_id}")
+        
+        # Reset opt-out state for new connection
+        self.recording_opt_out.discard(websocket)
+        
         try:
             # Keep connection alive and handle messages
             async for message in websocket:
@@ -205,8 +255,9 @@ class WebVoiceAgent:
                     msg_type = data.get('type')
                     
                     if msg_type == 'session_start':
-                        # Reset session for new connection
+                        # Reset session state but keep the same session ID for the connection
                         self._reset_session()
+                        
                         if websocket not in self.greeted_connections:
                             await self.send_greeting(websocket)
                             self.greeted_connections.add(websocket)
@@ -220,8 +271,8 @@ class WebVoiceAgent:
                         if config.VERBOSE:
                             print(f"📊 Received audio: {len(audio_bytes)} bytes")
                         
-                        # Store audio for recording (only if recordings are enabled)
-                        if config.ENABLE_RECORDINGS:
+                        # Store audio for recording (only if recordings are enabled AND not opted out)
+                        if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
                             if websocket not in self.audio_recordings:
                                 self.audio_recordings[websocket] = []
                             self.audio_recordings[websocket].append(audio_bytes)
@@ -281,9 +332,8 @@ class WebVoiceAgent:
             import traceback
             traceback.print_exc()
         finally:
-            # Save recording before disconnecting (only if recordings are enabled)
-            if config.ENABLE_RECORDINGS and websocket in self.audio_recordings:
-                await self.save_recording(websocket)
+            # Upload transcript and recording to blob storage
+            await self._upload_session_data(websocket)
             
             # Clean up session files and reset session state
             print("Session ending - cleaning up files and history...")
@@ -292,6 +342,10 @@ class WebVoiceAgent:
             
             self.active_connections.discard(websocket)
             self.greeted_connections.discard(websocket)
+            
+            # Clean up session tracking
+            self.session_data.pop(websocket, None)
+            self.audio_recordings.pop(websocket, None)
     
     async def stt_monitor_loop(self):
         """Monitor STT for transcripts and wait for complete speech before processing"""
@@ -415,7 +469,7 @@ class WebVoiceAgent:
     async def send_greeting(self, websocket):
         """Send initial greeting to user"""
         try:
-            greeting = "Hello! I'm ready to help. Just start talking when you're ready."
+            greeting = "Hello! I'm ready to help. This call is being recorded. Just say 'stop recording' if you prefer not to be recorded."
             
             # Send text greeting
             if not await self._safe_send(websocket, {
@@ -427,6 +481,12 @@ class WebVoiceAgent:
             # Synthesize and send audio
             audio_data = await self.tts.synthesize(greeting)
             if audio_data:
+                # Capture AI audio for recording
+                if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
+                    if websocket not in self.audio_recordings:
+                        self.audio_recordings[websocket] = []
+                    self.audio_recordings[websocket].append(audio_data)
+
                 chunk_size = 8192
                 for i in range(0, len(audio_data), chunk_size):
                     chunk = audio_data[i:i + chunk_size]
@@ -485,9 +545,49 @@ class WebVoiceAgent:
                 print(f"⚠️ WebSocket send error: {type(e).__name__}: {e}")
             return False
     
+
+    def _log_message(self, websocket, role: str, text: str):
+        """Log message to session history"""
+        if websocket in self.session_data:
+            self.session_data[websocket]['messages'].append({
+                'timestamp': datetime.now().isoformat(),
+                'role': role,
+                'content': text
+            })
+
     async def process_message(self, websocket, user_text: str):
         """Process user message with speculative TTS execution for faster response"""
         try:
+            # Log user message
+            self._log_message(websocket, "user", user_text)
+
+            # Check for opt-out intent
+            if config.ENABLE_RECORDINGS and ("stop recording" in user_text.lower() or "don't record" in user_text.lower()):
+                self.recording_opt_out.add(websocket)
+                # Delete any existing recording for this session
+                if websocket in self.audio_recordings:
+                    del self.audio_recordings[websocket]
+                
+                print(f"🚫 User opted out of recording")
+                await self._safe_send(websocket, {
+                    'type': 'response_text',
+                    'text': "Okay, I've stopped recording this session and deleted any audio captured so far."
+                })
+                self._log_message(websocket, "assistant", "Okay, I've stopped recording this session and deleted any audio captured so far.")
+                # Speak the confirmation (but don't record it)
+                confirmation_audio = await self.tts.synthesize("Okay, I've stopped recording this session.")
+                if confirmation_audio:
+                     # Send audio without appending to recording buffer
+                    chunk_size = 8192
+                    for i in range(0, len(confirmation_audio), chunk_size):
+                        chunk = confirmation_audio[i:i + chunk_size]
+                        await self._safe_send(websocket, {
+                            'type': 'audio_chunk',
+                            'audio': base64.b64encode(chunk).decode('utf-8')
+                        })
+                    await self._safe_send(websocket, {'type': 'audio_complete'})
+                return
+
             # Notify thinking
             if not await self._safe_send(websocket, {
                 'type': 'thinking',
@@ -540,6 +640,12 @@ class WebVoiceAgent:
                                     print(f"🔊 Starting TTS for first sentence...")
                                     first_audio_sent = True
                                 
+                                # Capture AI audio for recording
+                                if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
+                                    if websocket not in self.audio_recordings:
+                                        self.audio_recordings[websocket] = []
+                                    self.audio_recordings[websocket].append(audio)
+
                                 chunk_size = 8192
                                 for i in range(0, len(audio), chunk_size):
                                     chunk = audio[i:i + chunk_size]
@@ -556,6 +662,12 @@ class WebVoiceAgent:
                             while expected_order in pending:
                                 audio, _ = pending.pop(expected_order)
                                 if audio:
+                                    # Capture pending audio too
+                                    if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
+                                        if websocket not in self.audio_recordings:
+                                            self.audio_recordings[websocket] = []
+                                        self.audio_recordings[websocket].append(audio)
+                                        
                                     chunk_size = 8192
                                     for i in range(0, len(audio), chunk_size):
                                         chunk = audio[i:i + chunk_size]
@@ -588,6 +700,12 @@ class WebVoiceAgent:
                 try:
                     audio_data = await self.tts.synthesize(filler_text)
                     if audio_data:
+                        # Capture filler audio for recording
+                        if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
+                            if websocket not in self.audio_recordings:
+                                self.audio_recordings[websocket] = []
+                            self.audio_recordings[websocket].append(audio_data)
+                            
                         if config.DEBUG:
                             print(f"🎙️ Filler: {filler_text}")
                         chunk_size = 8192
@@ -644,21 +762,25 @@ class WebVoiceAgent:
                 from mcp_tools.form_tools import get_pending_form_updates
                 form_updates = get_pending_form_updates()
                 if form_updates:
+                    if config.DEBUG:
+                        print(f"📝 Applying {len(form_updates)} form updates from LLM")
                     for update in form_updates:
                         await self._safe_send(websocket, update)
-                    if config.DEBUG:
-                        print(f"📝 Sent {len(form_updates)} form update(s)")
             except ImportError:
                 pass
             
+            # Log full response
+            if full_response:
+                complete_response = " ".join(full_response)
+                self._log_message(websocket, "assistant", complete_response)
+                
+                if config.DEBUG:
+                    print(f"💬 AI: {complete_response[:100]}..." if len(complete_response) > 100 else f"💬 AI: {complete_response}")
+
             # Send completion signal
             await self._safe_send(websocket, {
                 'type': 'audio_complete'
             })
-            
-            final_text = ' '.join(full_response)
-            if config.DEBUG:
-                print(f"💬 AI: {final_text[:100]}..." if len(final_text) > 100 else f"💬 AI: {final_text}")
         
         except Exception as e:
             print(f"❌ Error processing message: {e}")

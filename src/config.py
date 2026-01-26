@@ -45,6 +45,13 @@ ENABLE_RECORDINGS = os.getenv("ENABLE_RECORDINGS", "false").lower() == "true"
 DEBUG = False
 VERBOSE = False
 
+# --- Azure Blob Storage (for logging transcripts and recordings) ---
+ENABLE_BLOB_LOGGING = os.getenv("ENABLE_BLOB_LOGGING", "false").lower() == "true"
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+AZURE_BLOB_CONTAINER_TRANSCRIPTS = os.getenv("AZURE_BLOB_CONTAINER_TRANSCRIPTS", "transcripts")
+AZURE_BLOB_CONTAINER_RECORDINGS = os.getenv("AZURE_BLOB_CONTAINER_RECORDINGS", "recordings")
+
+
 # --- System Prompt ---
 _current_dir = Path(__file__).parent
 PROMPTS_DIR = _current_dir / "prompts"
