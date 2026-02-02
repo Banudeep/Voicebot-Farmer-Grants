@@ -18,6 +18,8 @@
 
     -->
 
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
       :root {
         /* "Natural Daylight" Palette - 2026 Ag Style */
@@ -382,6 +384,24 @@
         font-weight: 500;
 
         transition: color 0.3s ease;
+      }
+
+      .session-id-badge {
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+        background: var(--bg-tertiary);
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-family: monospace;
+        margin-left: 8px;
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .session-id-badge:hover {
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
       }
 
       /* Enhanced Audio Visualizer */
@@ -1143,6 +1163,33 @@
         transform: none;
       }
 
+      .email-summary-btn {
+        padding: 12px 14px;
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+        min-width: 48px;
+      }
+
+      .email-summary-btn:hover:not(:disabled) {
+        background: var(--user-msg-bg);
+        color: white;
+        border-color: var(--user-msg-bg);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+      }
+
+      .email-summary-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
       /* Voice Controls */
 
       .voice-controls {
@@ -1660,6 +1707,66 @@
 
         line-height: 1.4;
       }
+      
+      .email-summary-btn {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-secondary);
+        padding: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        width: 36px;
+        height: 36px;
+      }
+      
+      .email-summary-btn:hover {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border-color: var(--text-tertiary);
+      }
+
+      /* Markdown Styles */
+      .message-content p {
+        margin: 0 0 8px 0;
+      }
+      .message-content p:last-child {
+        margin-bottom: 0;
+      }
+      .message-content strong {
+        font-weight: 600;
+        color: inherit;
+      }
+      .message-content ul, .message-content ol {
+        margin: 4px 0 8px 16px;
+        padding: 0;
+      }
+      .message-content li {
+        margin-bottom: 4px;
+      }
+      .message-content code {
+        background: rgba(0,0,0,0.1);
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9em;
+      }
+      [data-theme="dark"] .message-content code {
+        background: rgba(255,255,255,0.1);
+      }
+      .message-content pre {
+        background: rgba(0,0,0,0.05);
+        padding: 10px;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin: 8px 0;
+      }
+      [data-theme="dark"] .message-content pre {
+        background: rgba(255,255,255,0.05);
+      }
 
       /* Toast notifications */
 
@@ -2037,6 +2144,8 @@
 
           <span id="statusText" class="status-text">Connecting...</span>
 
+          <span id="sessionIdBadge" class="session-id-badge" style="display: none;" title="Session ID for reference"></span>
+
           <div
             class="visualizer-container"
             id="visualizerContainer"
@@ -2054,6 +2163,15 @@
 
         <div style="display: flex; align-items: center; gap: 10px">
           <div class="thinking" id="thinkingIndicator">AI is responding...</div>
+
+          <!-- Email Summary Button (New) -->
+          <button id="emailSummaryBtn" class="email-summary-btn" title="Email summary of conversation">
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+               <polyline points="22,6 12,13 2,6"></polyline>
+             </svg>
+          </button>
+
 
           <div class="mode-toggle-container">
             <div
@@ -2111,8 +2229,21 @@
             </div>
 
             <div class="settings-hint" style="margin-top: 4px">
-              💡 Playback speed adjustment (affects audio playback only, not
-              voice generation)
+              💡 Playback speed adjustment (client-side only)
+            </div>
+            
+            <div class="settings-row" style="margin-top: 16px;">
+              <span class="settings-label">Voice:</span>
+              <select class="settings-select" id="voiceSelect">
+                <option value="en-US-JennyNeural">Jenny (Female)</option>
+                <option value="en-US-GuyNeural">Guy (Male)</option>
+                <option value="en-US-AriaNeural">Aria (Female)</option>
+                <option value="en-US-DavisNeural">Davis (Male)</option>
+              </select>
+            </div>
+            
+             <div class="settings-hint" style="margin-top: 4px">
+              💡 Changes the AI's speaking voice for future responses
             </div>
           </div>
         </div>
@@ -2182,6 +2313,7 @@
               rows="1"
               disabled
             ></textarea>
+
             <button id="sendTextBtn" class="send-text-btn" disabled>
               Send
             </button>
@@ -2285,6 +2417,9 @@
       const PREBUFFER_BYTES = Math.floor((AUDIO_PREBUFFER_MS / 1000) * BYTES_PER_SECOND);
       let preBufferThresholdMet = false;
       let totalBufferedBytes = 0;
+      
+      // Manual playback state (for requesting TTS on demand)
+      let isManualPlayback = false;
 
       // WebSocket keep-alive configuration
       let keepAliveInterval = null;
@@ -2524,17 +2659,35 @@
         settingsPanel.classList.remove("active");
       });
 
+
+
       settingsSave.addEventListener("click", () => {
-        // Save settings (only playback speed is client-side)
-
+        // Save settings
         const speed = parseFloat(speedSlider.value);
-
+        const voice = voiceSelect.value;
+        
+        // 1. Client-side speed
         playbackSpeed = speed;
-
         localStorage.setItem("playbackSpeed", speed.toString());
+        
+        // 2. Voice setting (server-side via WebSocket)
+        localStorage.setItem("voiceName", voice);
+        
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'update_settings',
+                settings: {
+                    voice: voice
+                }
+            }));
+        }
+        
+        // Clear audio chunks from all existing messages to force re-synthesis with new voice
+        document.querySelectorAll('.message').forEach(msg => {
+            msg.audioChunks = null;
+        });
 
         showToast("Settings saved", "success");
-
         settingsPanel.classList.remove("active");
       });
 
@@ -2574,6 +2727,27 @@
 
           speedValue.textContent = speed.toFixed(1) + "x";
         }
+      }
+      
+      // Load saved voice
+      const savedVoice = localStorage.getItem("voiceName");
+      if (savedVoice) {
+         voiceSelect.value = savedVoice;
+      } else {
+         voiceSelect.value = "en-US-JennyNeural"; // Default
+      }
+      
+      // Send settings when WebSocket opens
+      function sendSettings() {
+         const voice = localStorage.getItem("voiceName") || "en-US-JennyNeural";
+         if (ws && ws.readyState === WebSocket.OPEN) {
+             ws.send(JSON.stringify({
+                 type: 'update_settings',
+                 settings: {
+                     voice: voice
+                 }
+             }));
+         }
       }
 
       // Scroll to bottom button
@@ -2696,6 +2870,8 @@
           startBtn.disabled = false;
 
           sendTextBtn.disabled = false;
+          
+          document.getElementById("emailSummaryBtn").disabled = false;
 
           textInput.disabled = false;
           
@@ -2711,6 +2887,20 @@
           }
 
           switch (data.type) {
+            case "session_id":
+              // Display session ID in the UI
+              const sessionIdBadge = document.getElementById("sessionIdBadge");
+              sessionIdBadge.textContent = `ID: ${data.session_id}`;
+              sessionIdBadge.style.display = "inline-block";
+              sessionIdBadge.title = `Session ID: ${data.session_id} (click to copy)`;
+              sessionIdBadge.onclick = () => {
+                navigator.clipboard.writeText(data.session_id).then(() => {
+                  showToast("Session ID copied to clipboard", "success");
+                });
+              };
+              console.log(`📋 Session ID: ${data.session_id}`);
+              break;
+
             case "transcript_partial":
               // Partial transcript (live update) - only show if not duplicate
 
@@ -2763,8 +2953,8 @@
               // Always buffer the audio for manual playback later
               currentResponseAudioChunks.push(bytes);
 
-              // Only auto-play if we are in voice mode
-              if (currentMode === "voice") {
+              // Only auto-play if we are in voice mode OR manual playback requested
+              if (currentMode === "voice" || isManualPlayback) {
                 audioQueue.push(bytes);
                 totalBufferedBytes += bytes.length;
 
@@ -2792,8 +2982,27 @@
 
               // Attach the buffered audio to the current assistant message
               if (currentResponseAudioChunks.length > 0) {
-                 attachAudioToLastMessage([...currentResponseAudioChunks]);
+                 // Check if there's a manual playback target
+                 const receivingMsg = document.querySelector(".message.receiving-audio");
+                 if (receivingMsg) {
+                     receivingMsg.audioChunks = [...currentResponseAudioChunks];
+                     receivingMsg.classList.remove("receiving-audio");
+                     
+                     // Update button state to "playing" (it was "loading")
+                     const listenBtn = receivingMsg.querySelector(".standalone-listen-btn");
+                     if (listenBtn) {
+                         listenBtn.classList.remove("loading");
+                         listenBtn.classList.add("playing");
+                         listenBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+                     }
+                 } else {
+                     // Standard flow - attach to last message
+                     attachAudioToLastMessage([...currentResponseAudioChunks]);
+                 }
               }
+              
+              // Reset manual flag
+              isManualPlayback = false;
               break;
 
             case "error":
@@ -2844,6 +3053,9 @@
           statusDot.classList.remove("connected", "recording", "speaking");
 
           statusText.textContent = "Disconnected";
+          
+          // Hide session ID badge
+          document.getElementById("sessionIdBadge").style.display = "none";
 
           startBtn.disabled = true;
 
@@ -2936,7 +3148,7 @@
         // Update the content of existing message
         const contentEl = streamingMessageElement.querySelector(".message-content");
         if (contentEl) {
-          contentEl.textContent = text;
+          contentEl.innerHTML = marked.parse(text);
         }
         chatContainer.scrollTop = chatContainer.scrollHeight;
       }
@@ -2946,7 +3158,7 @@
           // Update final text
           const contentEl = streamingMessageElement.querySelector(".message-content");
           if (contentEl) {
-            contentEl.textContent = text;
+            contentEl.innerHTML = marked.parse(text);
           }
           // Add action buttons
           const wrapper = streamingMessageElement.querySelector(".message-content-wrapper");
@@ -3017,7 +3229,7 @@
 
         content.className = "message-content";
 
-        content.textContent = text;
+        content.innerHTML = marked.parse(text);
 
         if (role === "assistant") {
             const contentRow = document.createElement("div");
@@ -3063,25 +3275,61 @@
             stopAudioPlayback();
             btn.classList.remove("playing");
             // Reset icon
+            // Reset to play icon depending on state (will be handled by logic below if we just swap innerHTML)
             btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
         } else {
-            // Start Playback
+            // Check if we have audio chunks
             if (messageEl && messageEl.audioChunks) {
-                // Reset any other playing buttons
+                // START PLAYBACK (EXISTING LOGIC)
                 document.querySelectorAll(".standalone-listen-btn.playing").forEach(b => {
                     b.classList.remove("playing");
                     b.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
                 });
                 
-                stopAudioPlayback(); // Stop any current audio
+                stopAudioPlayback(); 
                 
-                // Load chunks
                 audioQueue = [...messageEl.audioChunks];
                 playAudioQueue();
                 
                 btn.classList.add("playing");
-                // Stop icon
                 btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+            } else {
+                // NO AUDIO CHUNKS - REQUEST TTS
+                const contentEl = messageEl.querySelector(".message-content");
+                if (!contentEl) return;
+                
+                const text = contentEl.textContent || contentEl.innerText;
+                if (!text) return;
+                
+                // Set button to loading
+                btn.classList.add("loading"); // Add spinning style if available, or just disable
+                btn.innerHTML = '<span class="loading-spinner" style="width: 14px; height: 14px; border-width: 2px;"></span>'; // Reuse existing spinner style
+                
+                // Stop any other playback
+                stopAudioPlayback();
+                
+                // flag manual playback
+                isManualPlayback = true;
+                
+                // Clear audio queue for new stream
+                audioQueue = [];
+                currentResponseAudioChunks = [];
+                
+                // Attach the new chunks to *this* message as they arrive
+                // We'll use a hack to point the global streaming target to this message momentarily
+                // But better is to just let the global handler collect them, then attach manually at end
+                
+                // Send request
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'request_tts',
+                        text: text
+                    }));
+                    
+                    // Highlight this message as the "target" for the incoming audio
+                    // We can attach a temporary ID or property
+                    messageEl.classList.add("receiving-audio");
+                }
             }
         }
       }
@@ -3690,6 +3938,34 @@
       // Send button click
 
       sendTextBtn.addEventListener("click", sendTextMessage);
+
+      // Email summary button click
+      // Email summary button click
+      const emailSummaryBtn = document.getElementById("emailSummaryBtn");
+      emailSummaryBtn.addEventListener("click", () => {
+        // Check if there are messages in the chat
+        const hasMessages = chatContainer.querySelectorAll(".message").length > 0;
+        if (!hasMessages) {
+          showToast("Start a conversation first to get a summary", "error");
+          return;
+        }
+        
+        const command = "Please email me a summary of this conversation.";
+        
+        // Add to UI
+        addMessage("user", command);
+        
+        // Send to server
+        if (ws && ws.readyState === WebSocket.OPEN) {
+             ws.send(JSON.stringify({
+                type: "text_message",
+                text: command
+             }));
+             console.log(`📤 Sent summary request: ${command}`);
+        } else {
+            showToast("Not connected to server", "error");
+        }
+      });
 
       // Mode toggle click - detect which option was clicked
 

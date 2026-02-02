@@ -31,7 +31,7 @@ STT_SAMPLE_RATE = 16000
 STT_CHANNELS = 1
 
 # --- Speech Detection ---
-END_OF_SPEECH_TIMEOUT = 3
+END_OF_SPEECH_TIMEOUT = 5  # Fallback timeout - gives users time to think/spell
 
 # --- Conversation Settings ---
 MAX_CONVERSATION_HISTORY = 60

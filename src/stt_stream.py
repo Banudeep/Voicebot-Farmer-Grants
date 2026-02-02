@@ -98,7 +98,7 @@ class STTStream:
             # Set property to return interim results more frequently
             self.speech_config.set_property(
                 speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, 
-                "800"  # Increased from 500ms to 1000ms to allow semantic model to work better
+                "5000"  # 5 seconds - matches END_OF_SPEECH_TIMEOUT
             )
             
             # Start continuous recognition

@@ -29,3 +29,6 @@ cachetools>=5.0.0
 # Azure Blob Storage (for logging transcripts and recordings)
 azure-storage-blob>=12.0.0
 
+
+# PDF generation
+reportlab>=4.0.0

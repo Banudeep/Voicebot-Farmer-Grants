@@ -1,55 +1,174 @@
 {
-    "AD-2100.pdf": {
-        "title": "AD-2100: Request for Information or Documentation",
-        "purpose": "Request for additional information/documentation from program participants.",
-        "next_steps": "Submit to your local USDA Service Center.",
-        "field_count": 17,
-        "estimated_time": "8 minutes",
-        "categories": {
-            "Dates": 6,
-            "General Information": 7,
-            "Contact Information": 4
-        }
+  "AD-3117.pdf": {
+    "title": "AD-3117: CFAP 2 Application",
+    "purpose": "Application for Coronavirus Food Assistance Program 2 benefits.",
+    "next_steps": "Submit to your County FSA office.",
+    "field_count": 9,
+    "estimated_time": "7–9 minutes (voicebot)",
+    "categories": {
+      "General Information": 3,
+      "Contact Information": 3,
+      "Farm Details": 3
     },
-    "AD-3117.pdf": {
-        "title": "AD-3117: Conservation Program Application",
-        "purpose": "Application for USDA conservation programs (CSP, EQIP, etc.).",
-        "next_steps": "Submit to NRCS office. Site visit may be required.",
-        "field_count": 64,
-        "estimated_time": "32 minutes",
-        "categories": {
-            "General Information": 18,
-            "Contact Information": 7,
-            "Dates": 10,
-            "Farm Details": 29
-        }
+    "curated_fields": [
+      {
+        "field_id": "form[0].Page1[0].Page1[0]._1_Recording_State[0]",
+        "label": "Recording State",
+        "category": "General Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].Page1[0]._3__Recording_County[0]",
+        "label": "Recording County",
+        "category": "General Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].Page1[0]._4_Application_Number[0]",
+        "label": "Application Number (if you have one, otherwise leave blank)",
+        "category": "General Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].Page1[0]._5_Producers_Name_Address_City_State_and_Zip_Code_and_Phone_Number_Include_Area_Code[0]",
+        "label": "Producer's Full Name and Address (City, State, Zip Code)",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].Page1[0]._7_Total_Production_April_1_2020__August_31_2020LBS[0]",
+        "label": "Total Milk Production from April 1, 2020 to August 31, 2020 (in pounds)",
+        "category": "Farm Details"
+      },
+      {
+        "field_id": "form[0].Page1[0].Page1[0]._9_Estimated_Total_Production_Sept_1_2020__Dec_31_2020LBS[0]",
+        "label": "Estimated Total Production from September 1, 2020 to December 31, 2020 (in pounds)",
+        "category": "Farm Details"
+      },
+      {
+        "field_id": "form[0].Page1[0].Page1[0].MMDDYYYY[0]",
+        "label": "Date you are filling out this application (MM/DD/YYYY)",
+        "category": "General Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].Page1[0]._13_2019_Total_ProductionHEAD[0]",
+        "label": "2019 Total Production - Number of Head (cattle, hogs, sheep, etc.)",
+        "category": "Farm Details"
+      },
+      {
+        "field_id": "form[0].Page2[0]._28B_TitleRelationship_of_the_Individual_Signing_in_the_Representative_Capacity[0]",
+        "label": "Your Title or Relationship (if signing as a representative)",
+        "category": "Contact Information"
+      }
+    ],
+    "note": "This form has 114 PDF fields but only 9 are collected via voicebot. COC-adjusted fields are completed by FSA staff."
+  },
+
+  "AD1069.pdf": {
+    "title": "AD-1069: Request for Good Faith Relief",
+    "purpose": "Request relief from a Wetland Conservation (WC) violation (Part A only).",
+    "next_steps": "Submit Part A to your local FSA office. NRCS and COC complete remaining sections.",
+    "field_count": 8,
+    "estimated_time": "9–12 minutes (voicebot)",
+    "categories": {
+      "Contact Information": 3,
+      "Farm Details": 3,
+      "General Information": 2
     },
-    "AD1069.pdf": {
-        "title": "AD-1069: Request for Good Faith Relief",
-        "purpose": "Application for relief from Wetland Conservation (WC) violations (Part A only).",
-        "next_steps": "Complete Part A and submit to your local FSA office. NRCS will complete Part B.",
-        "field_count": 8,
-        "estimated_time": "4 minutes",
-        "categories": {
-            "Contact Information": 2,
-            "Identification": 1,
-            "Farm Details": 2,
-            "General Information": 2,
-            "Dates": 1
-        }
+    "curated_fields": [
+      {
+        "field_id": "form[0].Page1[0].item1a[0]",
+        "label": "State where your farm is located",
+        "category": "Farm Details"
+      },
+      {
+        "field_id": "form[0].Page1[0].item1b[0]",
+        "label": "County where your farm is located",
+        "category": "Farm Details"
+      },
+      {
+        "field_id": "form[0].Page1[0].item2[0]",
+        "label": "Your full name and address (including Zip Code)",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].item3[0]",
+        "label": "Your phone number (including area code)",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].item4[0]",
+        "label": "Last 4 digits of your Social Security Number or Tax ID",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].item5[0]",
+        "label": "Farm number where the wetland activity occurred",
+        "category": "Farm Details"
+      },
+      {
+        "field_id": "form[0].Page1[0].item6[0]",
+        "label": "Crop year for which you are requesting good faith determination",
+        "category": "General Information"
+      },
+      {
+        "field_id": "form[0].Page1[0].item7[0]",
+        "label": "Reasons for your good faith determination request (describe the circumstances and evidence)",
+        "category": "General Information"
+      }
+    ],
+    "note": "This form has 29 PDF fields but only 8 are collected via voicebot (Part A - Producer section). Items 9-23 are completed by FSA/NRCS staff."
+  },
+
+  "BCAP-1.pdf": {
+    "title": "BCAP-1: Biomass Crop Assistance Program Application",
+    "purpose": "Initial eligibility intake for Biomass Crop Assistance Program participation.",
+    "next_steps": "Submit to County FSA office. Additional documentation collected offline if required.",
+    "field_count": 8,
+    "estimated_time": "10–14 minutes (voicebot, gated)",
+    "categories": {
+      "General Information": 1,
+      "Contact Information": 5,
+      "Farm Details": 2
     },
-    "BCAP-1.pdf": {
-        "title": "BCAP-1: Biomass Crop Assistance Program Application",
-        "purpose": "Application for Biomass Crop Assistance Program.",
-        "next_steps": "Submit to FSA office with land eligibility docs.",
-        "field_count": 337,
-        "estimated_time": "168 minutes",
-        "categories": {
-            "General Information": 97,
-            "Contact Information": 34,
-            "Dates": 68,
-            "Identification": 2,
-            "Farm Details": 136
-        }
-    }
+    "curated_fields": [
+      {
+        "field_id": "form[0].Page1[0]._1[0]",
+        "label": "Name of Biomass Conversion Facility",
+        "category": "General Information"
+      },
+      {
+        "field_id": "form[0].Page1[0]._3a[0]",
+        "label": "Facility Street Address",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0]._3b[0]",
+        "label": "Facility City",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0]._3c[0]",
+        "label": "Facility State",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0]._3d[0]",
+        "label": "Facility Zip Code",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0]._4[0]",
+        "label": "County where facility is located",
+        "category": "Farm Details"
+      },
+      {
+        "field_id": "form[0].Page1[0]._6[0]",
+        "label": "Facility Phone Number",
+        "category": "Contact Information"
+      },
+      {
+        "field_id": "form[0].Page1[0]._7[0]",
+        "label": "Facility Email Address",
+        "category": "Contact Information"
+      }
+    ],
+    "note": "This form has 370+ PDF fields but only 8 are collected via voicebot. Remaining fields require in-person FSA visit."
+  }
 }

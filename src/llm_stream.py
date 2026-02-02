@@ -647,7 +647,7 @@ class LLMStream:
             
             return "I encountered an error. Please try asking your question again."
     
-    async def generate_response_streaming(self, user_message: str, filler_callback=None):
+    async def generate_response_streaming(self, user_message: str, filler_callback=None, input_mode: str = "voice"):
         """
         Generate response with sentence-level streaming for faster TTS.
         
@@ -655,6 +655,7 @@ class LLMStream:
             user_message: The user's message
             filler_callback: Async callback to send filler audio before tool execution.
                            Called with filler phrase text, should synthesize and play audio.
+            input_mode: Either 'voice' or 'text' - affects how the LLM responds
         
         Yields:
             tuple: (sentence: str, is_final: bool)
@@ -669,9 +670,16 @@ class LLMStream:
         if len(self.conversation_history) > config.MAX_CONVERSATION_HISTORY:
             self.conversation_history = self.conversation_history[-config.MAX_CONVERSATION_HISTORY:]
         
-        # Prepare messages
+        # Add input mode context to system prompt
+        mode_hint = ""
+        if input_mode == "text":
+            mode_hint = "\n\n[USER IS TYPING - Do NOT ask them to spell out names. They are using a keyboard, not voice.]"
+        else:
+            mode_hint = "\n\n[USER IS SPEAKING - For name fields, ask them to spell out their name letter by letter for accuracy.]"
+        
+        # Prepare messages with mode-aware system prompt
         messages = [
-            {"role": "system", "content": self.system_prompt},
+            {"role": "system", "content": self.system_prompt + mode_hint},
             *self.conversation_history
         ]
         

@@ -18,7 +18,7 @@ from llm_stream import LLMStream
 from stt_stream import STTStream
 from tts_stream import TTSStream
 from blob_storage import get_blob_logger
-from mcp_tools.form_tools import get_active_form_state, cleanup_session_files
+from mcp_tools.form_tools import get_active_form_state, cleanup_session_files, set_chat_messages, set_session_id
 import config
 
 class WebVoiceAgent:
@@ -144,7 +144,7 @@ class WebVoiceAgent:
         await self._safe_send(websocket, {'type': 'transcript', 'text': complete_text})
         
         self.current_processing_task = asyncio.create_task(
-            self.process_message(websocket, complete_text)
+            self.process_message(websocket, complete_text, input_mode="voice")
         )
         self.current_speech = ""
         self.last_transcript_time = None
@@ -220,14 +220,12 @@ class WebVoiceAgent:
         print(f"  Active connections: {len(self.active_connections)}")
         
         # Initialize session tracking immediately upon connection
-        session_id = str(uuid.uuid4())[:8]
+        # Initialize session tracking immediately upon connection
+        # Format: xxxxxxxx (8-char hex UUID)
+        session_id = uuid.uuid4().hex[:8]
         
         # Pass session ID to form tools for email reference
-        try:
-            from mcp_tools.form_tools import set_session_id
-            set_session_id(session_id)
-        except ImportError:
-            pass
+        set_session_id(session_id)
             
         self.session_data[websocket] = {
             'session_id': session_id,
@@ -235,6 +233,12 @@ class WebVoiceAgent:
             'messages': []
         }
         print(f"📝 Session initialized: {session_id}")
+        
+        # Send session ID to frontend for display
+        await self._safe_send(websocket, {
+            'type': 'session_id',
+            'session_id': session_id
+        })
         
         # Reset opt-out state for new connection
         self.recording_opt_out.discard(websocket)
@@ -284,7 +288,7 @@ class WebVoiceAgent:
                         # Direct text input
                         text = data.get('text', '').strip()
                         if text:
-                            await self.process_message(websocket, text)
+                            await self.process_message(websocket, text, input_mode="text")
                     
                     elif msg_type == 'form_field_update':
                         # Manual edit from UI panel
@@ -303,6 +307,33 @@ class WebVoiceAgent:
                     elif msg_type == 'ping':
                         # WebSocket keep-alive ping from client
                         await self._safe_send(websocket, {'type': 'pong'})
+                    
+                    elif msg_type == 'update_settings':
+                        # Update settings (e.g. voice)
+                        settings = data.get('settings', {})
+                        voice_name = settings.get('voice')
+                        if voice_name:
+                            self.tts.set_voice(voice_name)
+                            if config.DEBUG:
+                                print(f"✓ Voice setting updated to: {voice_name}")
+                    
+                    elif msg_type == 'request_tts':
+                        # Manual request for TTS (e.g. playing old messages with new voice)
+                        text = data.get('text', '').strip()
+                        if text:
+                            # Callback to send audio chunks to frontend
+                            async def send_chunk(chunk):
+                                audio_b64 = base64.b64encode(chunk).decode('utf-8')
+                                await self._safe_send(websocket, {
+                                    'type': 'audio_chunk',
+                                    'audio': audio_b64
+                                })
+                            
+                            # Stream the synthesis
+                            await self.tts.synthesize_stream(text, send_chunk)
+                            
+                            # Signal completion
+                            await self._safe_send(websocket, {'type': 'audio_complete'})
                     
                 except json.JSONDecodeError:
                     print("⚠️ Invalid JSON received")
@@ -555,8 +586,14 @@ class WebVoiceAgent:
                 'content': text
             })
 
-    async def process_message(self, websocket, user_text: str):
-        """Process user message with speculative TTS execution for faster response"""
+    async def process_message(self, websocket, user_text: str, input_mode: str = "voice"):
+        """Process user message with speculative TTS execution for faster response
+        
+        Args:
+            websocket: WebSocket connection
+            user_text: The user's message text
+            input_mode: Either 'voice' or 'text' - affects how the LLM responds (e.g., spelling requests only in voice mode)
+        """
         try:
             # Log user message
             self._log_message(websocket, "user", user_text)
@@ -594,6 +631,10 @@ class WebVoiceAgent:
                 'status': 'start'
             }):
                 return  # Connection closed
+            
+            # Pass current chat messages to form_tools for email summary feature
+            if websocket in self.session_data:
+                set_chat_messages(self.session_data[websocket]['messages'])
             
             if config.DEBUG:
                 print("🤖 Thinking...")
@@ -723,7 +764,10 @@ class WebVoiceAgent:
             # Start audio sender task (runs concurrently)
             audio_sender = asyncio.create_task(send_audio_in_order())
             
-            async for sentence, is_final in self.llm.generate_response_streaming(user_text, filler_callback=send_filler_audio):
+            # Only use filler callback in voice mode
+            filler_cb = send_filler_audio if input_mode == "voice" else None
+            
+            async for sentence, is_final in self.llm.generate_response_streaming(user_text, filler_callback=filler_cb, input_mode=input_mode):
                 if not sentence:
                     continue
                     

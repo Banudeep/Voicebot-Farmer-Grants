@@ -99,6 +99,25 @@ class TTSStream:
             print(f"❌ TTS error: {e}")
             return b""
     
+    def set_voice(self, voice_name: str):
+        """Update the voice used for synthesis."""
+        if not voice_name:
+            return
+            
+        try:
+            # Update config and recreate synthesizer
+            self.speech_config.speech_synthesis_voice_name = voice_name
+            
+            # Re-initialize synthesizer with new voice config
+            self._synthesizer = speechsdk.SpeechSynthesizer(
+                speech_config=self.speech_config, audio_config=None
+            )
+            
+            if config.DEBUG:
+                print(f"✓ Voice updated to: {voice_name}")
+        except Exception as e:
+            print(f"❌ Error updating voice to {voice_name}: {e}")
+
     async def synthesize_stream(self, text: str, chunk_callback):
         """Stream audio synthesis with callback for each chunk"""
         await self._synthesize_stream_azure(text, chunk_callback)

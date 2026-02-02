@@ -23,6 +23,16 @@ try:
 except ImportError:
     HAS_PYPDF = False
 
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    HAS_REPORTLAB = True
+except ImportError:
+    HAS_REPORTLAB = False
+
 # Base directory for documents (project root)
 DOCUMENT_DIR = Path(__file__).resolve().parent.parent.parent / "Document"
 
@@ -163,7 +173,7 @@ async def list_available_forms() -> Dict[str, Any]:
     return {
         "success": True,
         "forms": forms,
-        "count": len(forms)
+        "count": len(forms) 
     }
 
 async def get_form_fields(form_name: str) -> Dict[str, Any]:
@@ -192,7 +202,7 @@ async def get_form_fields(form_name: str) -> Dict[str, Any]:
         })
     
     # Use shared helper to get farmer-relevant fields
-    fields_summary = _get_farmer_fields(schema)
+    fields_summary = _get_farmer_fields(schema, form_name)
     
     # Cache the count so progress bar shows the exact same number
     _FARMER_FIELD_COUNT[form_name] = len(fields_summary)
@@ -204,11 +214,34 @@ async def get_form_fields(form_name: str) -> Dict[str, Any]:
         "total_fields": len(fields_summary)
     }
 
-def _get_farmer_fields(schema: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _get_farmer_fields(schema: Dict[str, Any], form_name: str = None) -> List[Dict[str, Any]]:
     """
     Extract only the fields relevant to the farmer, filtering out office use, signatures, etc.
     Also categorizes fields for summary.
+    
+    If form_name is provided and has 'curated_fields' in STATIC_FORM_DESCRIPTIONS,
+    use that curated list instead of applying heuristics.
     """
+    # Check for curated fields in form metadata (for complex forms like BCAP-1)
+    if form_name and form_name in STATIC_FORM_DESCRIPTIONS:
+        form_meta = STATIC_FORM_DESCRIPTIONS[form_name]
+        curated = form_meta.get("curated_fields", [])
+        
+        if curated:
+            # Use the curated field list directly from metadata
+            fields_summary = []
+            for field_def in curated:
+                fid = field_def.get("field_id")
+                if fid and fid in schema:
+                    fields_summary.append({
+                        "field_id": fid,
+                        "description": field_def.get("label", schema[fid].get('description', fid)),
+                        "type": "text",
+                        "category": field_def.get("category", "General Information")
+                    })
+            return fields_summary
+    
+    # Default behavior: apply heuristics
     fields_summary = []
     for fid, data in schema.items():
         # Only show TEXT fields (/Tx)
@@ -440,8 +473,106 @@ def _normalize_voice_input(value: str, field_id: str) -> str:
     # Clean up extra whitespace
     normalized = ' '.join(normalized.split())
     
-    # Email-specific corrections (for email fields)
-    if "email" in field_id_lower or "@" in normalized or " at " in normalized.lower():
+    # Name field normalization (for spelled-out names)
+    name_field_keywords = ['name', 'applicant', 'producer', 'contact', 'first', 'last', 'middle']
+    if any(kw in field_id_lower for kw in name_field_keywords) and 'email' not in field_id_lower:
+        # Strip common prefixes people say before spelling
+        name_prefix_patterns = [
+            r"^(it's spelled|that's spelled|spelled|it's|that's|my name is|the name is)\s*",
+            r"^(sure|yes|okay|ok)[,.]?\s*",
+        ]
+        for pattern in name_prefix_patterns:
+            normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
+        normalized = normalized.strip()
+        
+        # Check if this looks like spelled-out letters (single letters with spaces)
+        # Pattern: "J O H N" or "j o h n" or "J. O. H. N."
+        words = normalized.split()
+        
+        # NATO phonetic alphabet mapping
+        nato_alphabet = {
+            'alfa': 'A', 'alpha': 'A', 'bravo': 'B', 'charlie': 'C', 'delta': 'D',
+            'echo': 'E', 'foxtrot': 'F', 'golf': 'G', 'hotel': 'H', 'india': 'I',
+            'juliet': 'J', 'juliett': 'J', 'kilo': 'K', 'lima': 'L', 'mike': 'M',
+            'november': 'N', 'oscar': 'O', 'papa': 'P', 'quebec': 'Q', 'romeo': 'R',
+            'sierra': 'S', 'tango': 'T', 'uniform': 'U', 'victor': 'V', 'whiskey': 'W',
+            'xray': 'X', 'x-ray': 'X', 'yankee': 'Y', 'zulu': 'Z'
+        }
+        
+        # Check for NATO phonetic spelling (e.g., "Juliet Oscar Hotel November")
+        nato_letters = []
+        is_nato = False
+        for word in words:
+            word_lower = word.lower().strip('.,')
+            if word_lower in nato_alphabet:
+                nato_letters.append(nato_alphabet[word_lower])
+                is_nato = True
+            elif len(word) == 1 and word.isalpha():
+                nato_letters.append(word.upper())
+        
+        if is_nato and len(nato_letters) >= 2:
+            # This is NATO phonetic spelling, join the letters
+            normalized = ''.join(nato_letters).title()
+        elif len(words) >= 2:
+            # Check if all words are single letters (regular spelling)
+            single_letters = [w.strip('.').upper() for w in words if len(w.strip('.')) == 1 and w.strip('.').isalpha()]
+            if len(single_letters) == len(words) and len(single_letters) >= 2:
+                # All words are single letters - join them
+                normalized = ''.join(single_letters).title()
+        
+        # Final cleanup - ensure proper title case
+        if normalized and len(normalized) > 1:
+            normalized = normalized.title()
+    
+    # Email-specific corrections - use semantic detection instead of field keywords
+    # Detect email patterns semantically: looks for "word at/@ domain dot/. extension"
+    def _looks_like_email(text: str) -> bool:
+        """Detect if text semantically looks like an email address."""
+        text_lower = text.lower()
+        
+        # Already contains @ symbol
+        if '@' in text:
+            return True
+        
+        # Common spoken email patterns
+        # Pattern: "something at something dot something"
+        spoken_email_pattern = r'\b\w+\s+(at|@)\s+\w+\s+(dot|\.)\s+\w+'
+        if re.search(spoken_email_pattern, text_lower):
+            return True
+        
+        # Common email domains mentioned (even without "at")
+        common_domains = ['gmail', 'yahoo', 'hotmail', 'outlook', 'icloud', 'aol', 'protonmail', 'mail', 'email']
+        common_tlds = ['dot com', 'dot org', 'dot net', 'dot gov', 'dot edu', '.com', '.org', '.net', '.gov', '.edu']
+        
+        has_domain = any(domain in text_lower for domain in common_domains)
+        has_tld = any(tld in text_lower for tld in common_tlds)
+        
+        # If text contains a domain AND a TLD pattern, it's likely an email
+        if has_domain and has_tld:
+            return True
+        
+        # Check for "at" followed by domain-like word
+        if ' at ' in text_lower and has_domain:
+            return True
+        
+        return False
+    
+    if _looks_like_email(normalized):
+        # First, strip common preceding phrases from voice input
+        # These patterns match phrases that users typically say before their email
+        email_prefix_patterns = [
+            r"^(my email is|my email address is|my email's|email is|the email is)\s*",
+            r"^(it's|its|it is|that's|that is|that would be)\s*",
+            r"^(you can reach me at|reach me at|contact me at)\s*",
+            r"^(sure|yes|yeah|ok|okay)[,.]?\s*(it's|its|it is|that's|my email is)?\s*",
+            r"^(i can be reached at|send it to)\s*",
+        ]
+        for pattern in email_prefix_patterns:
+            normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
+        
+        # Clean up any leading/trailing whitespace after prefix removal
+        normalized = normalized.strip()
+        
         # Common voice transcription fixes for email
         email_corrections = [
             (r'\s+at\s+', '@'),                    # "john at gmail" -> "john@gmail"
@@ -732,32 +863,60 @@ async def send_form_email(
         
         # Try to find farmer's name for greeting
         farmer_name = None
-        name_keywords = ['name', 'producer', 'applicant', 'contact']
         
-        # Get schema to check field descriptions (semantic search)
+        # Patterns that explicitly ask for name (prioritize full name fields)
+        full_name_patterns = ['full name', 'producer name', 'applicant name', 'your name', 'farmer name']
+        # Combined name+address fields (need to extract name portion)
+        name_address_patterns = ['name and address']
+        
+        # Get schema to check field descriptions
         schema = _get_form_schema(form_name)
         
-        # Look for a field that contains one of the keywords and has a value
+        def extract_name_from_value(value: str, is_combined_field: bool = False) -> str:
+            """Extract name from field value, handling combined name+address fields."""
+            value_str = str(value).strip()
+            
+            if is_combined_field:
+                # For combined "Name and Address" fields, name is usually the first part before comma
+                # Example: "Arcita S., Sendo Rd., Mount Jackson, VA 22842" -> "Arcita S."
+                parts = value_str.split(',')
+                if parts:
+                    # Take first part as name, but verify it doesn't look like a street
+                    first_part = parts[0].strip()
+                    # Skip if it looks like a street address (contains numbers or road keywords)
+                    road_keywords = ['rd', 'road', 'st', 'street', 'ave', 'avenue', 'blvd', 'drive', 'dr', 'lane', 'ln', 'way', 'court', 'ct']
+                    if not any(char.isdigit() for char in first_part):
+                        first_lower = first_part.lower()
+                        if not any(kw in first_lower for kw in road_keywords):
+                            return first_part.title()
+                return None
+            
+            return value_str.title()
+        
         for key, value in form_data.items():
-            if not value or len(str(value)) < 3:
-                continue
-                
-            # Skip if value is a date or number
-            if any(char.isdigit() for char in str(value)):
+            if not value or len(str(value)) < 2:
                 continue
             
-            # Check Field ID
-            if any(k in key.lower() for k in name_keywords):
-                farmer_name = str(value).title()
-                break
-            
-            # Check Field Description (Semantic)
+            key_lower = key.lower()
+            description = ''
             if isinstance(schema, dict) and key in schema:
                 description = schema[key].get('description', '').lower()
-                if any(k in description for k in name_keywords):
-                    farmer_name = str(value).title()
+            
+            # First, check for explicit full name fields (highest priority)
+            if any(pattern in key_lower for pattern in full_name_patterns) or \
+               any(pattern in description for pattern in full_name_patterns):
+                farmer_name = extract_name_from_value(value, is_combined_field=False)
+                if farmer_name:
+                    break
+            
+            # Then, check for combined name+address fields
+            if any(pattern in key_lower for pattern in name_address_patterns) or \
+               any(pattern in description for pattern in name_address_patterns):
+                farmer_name = extract_name_from_value(value, is_combined_field=True)
+                if farmer_name:
                     break
         
+        # Only include name in greeting if we found a valid name
         greeting = f"Greetings {farmer_name}," if farmer_name else "Greetings,"
 
         # Create email with HTML and plain text versions
@@ -1163,6 +1322,246 @@ GET_FORM_SUMMARY_TOOL = {
     }
 }
 
+# --- Chat Summary Email ---
+# Storage for chat messages (set by web_voice_agent)
+_CHAT_MESSAGES = []
+
+def set_chat_messages(messages: list):
+    """Set the current session's chat messages for email summary."""
+    global _CHAT_MESSAGES
+    _CHAT_MESSAGES = messages
+
+def _generate_transcript_pdf(messages: list, summary_text: str = None) -> bytes:
+    """Generate a formatted PDF transcript using ReportLab."""
+    if not HAS_REPORTLAB:
+        return None
+        
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=72, leftMargin=72,
+        topMargin=72, bottomMargin=72
+    )
+    
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title
+    title_style = styles["Heading1"]
+    title_style.alignment = 1  # Center
+    story.append(Paragraph("USDA Voice Assistant - Conversation Transcript", title_style))
+    story.append(Spacer(1, 12))
+    
+    # Date/Time
+    date_str = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+    story.append(Paragraph(f"Date: {date_str}", styles["Normal"]))
+    if _CURRENT_SESSION_ID:
+        story.append(Paragraph(f"Session ID: {_CURRENT_SESSION_ID}", styles["Normal"]))
+    story.append(Spacer(1, 24))
+    
+    # Summary Section
+    if summary_text:
+        story.append(Paragraph("Summary", styles["Heading2"]))
+        # Split bullets if present
+        for line in summary_text.split('\n'):
+            if line.strip():
+                story.append(Paragraph(line.strip(), styles["Normal"]))
+        story.append(Spacer(1, 24))
+    
+    # Transcript
+    story.append(Paragraph("Full Transcript", styles["Heading2"]))
+    story.append(Spacer(1, 12))
+    
+    # Define styles for chat bubbles
+    user_style = ParagraphStyle(
+        'UserStyle',
+        parent=styles['Normal'],
+        fontSize=11,
+        leading=14,
+        textColor=colors.black,
+        backColor=colors.Color(0.9, 0.95, 1), # Light Blue
+        borderPadding=10,
+        spaceBefore=6,
+        spaceAfter=15,
+        borderRadius=8
+    )
+    
+    assistant_style = ParagraphStyle(
+        'AssistantStyle',
+        parent=styles['Normal'],
+        fontSize=11,
+        leading=14,
+        textColor=colors.black,
+        backColor=colors.Color(0.95, 0.95, 0.95), # Light Grey
+        borderPadding=10,
+        spaceBefore=6,
+        spaceAfter=15,
+        borderRadius=8
+    )
+    
+    header_style = ParagraphStyle(
+        'HeaderStyle',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.grey,
+        spaceAfter=8
+    )
+    
+    for msg in messages:
+        role = msg.get('role', 'unknown')
+        content = msg.get('content', '')
+        timestamp = msg.get('timestamp', '')
+        
+        # Format time
+        time_str = ""
+        if timestamp:
+            try:
+                dt = datetime.fromisoformat(timestamp)
+                time_str = dt.strftime("%I:%M %p")
+            except:
+                pass
+        
+        if role == "user":
+            header_text = f"<b>You</b> • {time_str}" if time_str else "<b>You</b>"
+            style = user_style
+        else: # assistant or other
+            header_text = f"<b>USDA Assistant</b> • {time_str}" if time_str else "<b>USDA Assistant</b>"
+            style = assistant_style
+            
+        story.append(Paragraph(header_text, header_style))
+        story.append(Paragraph(content, style))
+        story.append(Spacer(1, 6))
+        
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+async def send_chat_summary(
+    recipient_email: str,
+    summary_text: str = None
+) -> Dict[str, Any]:
+    """
+    Send the conversation history to the user's email.
+    Includes a PDF transcript attachment.
+    """
+    if not _CHAT_MESSAGES:
+        return {
+            "success": False,
+            "error": "No conversation history to send."
+        }
+    
+    # Get SMTP settings
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    sender_email = os.getenv("SMTP_FROM", smtp_user)
+    
+    if not smtp_user or not smtp_password:
+        return {
+            "success": False,
+            "error": "Email not configured. Set SMTP_USER and SMTP_PASSWORD in .env"
+        }
+    
+    current_date = datetime.now().strftime("%B %d, %Y")
+    
+    try:
+        # Create email
+        msg = MIMEMultipart("mixed") # mixed content for attachments
+        msg["Subject"] = f"Your USDA Assistant Conversation Summary - {current_date}"
+        msg["From"] = sender_email
+        msg["To"] = recipient_email
+        
+        # Message Body
+        body_text = f"""
+USDA GRANTS ASSISTANT
+Conversation Summary
+Date: {datetime.now().strftime("%B %d, %Y at %I:%M %p")}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thank you for using the USDA Voice Assistant! 
+
+Find your conversation transcript attached as a PDF for your records.
+
+"""
+        if summary_text:
+            body_text += f"""
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{summary_text}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+            
+        body_text += """
+NEXT STEPS
+• Review the attached PDF transcript
+• Contact your local USDA Service Center for follow-up questions
+• Find your local office at: https://www.farmers.gov/service-locator
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+USDA is an equal opportunity provider, employer, and lender.
+"""
+        msg.attach(MIMEText(body_text, "plain"))
+        
+        # Parse Chat History for Plain Text fallback (optional) or just use PDF
+        # Generating PDF
+        if HAS_REPORTLAB:
+            pdf_bytes = _generate_transcript_pdf(_CHAT_MESSAGES, summary_text)
+            if pdf_bytes:
+                pdf_attachment = MIMEApplication(pdf_bytes, _subtype="pdf")
+                pdf_attachment.add_header(
+                    "Content-Disposition", 
+                    "attachment", 
+                    filename=f"USDA_Conversation_{current_date.replace(' ', '_').replace(',', '')}.pdf"
+                )
+                msg.attach(pdf_attachment)
+            else:
+                 msg.attach(MIMEText("\n[Error: Could not generate PDF transcript]", "plain"))
+        else:
+            msg.attach(MIMEText("\n[Note: PDF generation unavailable]", "plain"))
+            
+        
+        # Send
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(sender_email, recipient_email, msg.as_string())
+        
+        return {
+            "success": True,
+            "message": f"Chat summary and PDF transcript sent to {recipient_email}!"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to send: {str(e)}"
+        }
+
+SEND_CHAT_SUMMARY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "send_chat_summary",
+        "description": "Send a summary and transcript of the conversation to user's email. Use when user wants to save the info or says goodbye.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "recipient_email": {
+                    "type": "string",
+                    "description": "User's email address"
+                },
+                "summary_text": {
+                    "type": "string",
+                    "description": "A concise 3-5 bullet point summary of what was discussed, decisions made, and follow-up items. GENERATE THIS YOURSELF based on the conversation history."
+                }
+            },
+            "required": ["recipient_email", "summary_text"]
+        }
+    }
+}
+
 FORM_TOOLS = [
     LIST_FORMS_TOOL,
     GET_FORM_FIELDS_TOOL,
@@ -1170,7 +1569,8 @@ FORM_TOOLS = [
     GET_FORM_STATUS_TOOL,
     SEND_FORM_EMAIL_TOOL,
     SEND_ALL_FORMS_EMAIL_TOOL,
-    GET_FORM_SUMMARY_TOOL
+    GET_FORM_SUMMARY_TOOL,
+    SEND_CHAT_SUMMARY_TOOL
 ]
 
 FORM_TOOL_FUNCTIONS = {
@@ -1180,5 +1580,7 @@ FORM_TOOL_FUNCTIONS = {
     "get_form_status": get_form_status,
     "send_form_email": send_form_email,
     "send_all_forms_email": send_all_forms_email,
-    "get_form_summary": get_form_summary
+    "get_form_summary": get_form_summary,
+    "send_chat_summary": send_chat_summary
 }
+
