@@ -586,6 +586,27 @@ class WebVoiceAgent:
                 'content': text
             })
 
+    def _sanitize_text(self, text: str) -> str:
+        """Sanitize text to fix rendering issues with special characters"""
+        if not text:
+            return text
+            
+        # Replace non-standard dashes/hyphens with standard ASCII hyphen
+        replacements = {
+            '\u2013': '-',  # en-dash
+            '\u2014': '-',  # em-dash
+            '\u2212': '-',  # minus sign
+            '\u2010': '-',  # hyphen
+            '\u2011': '-',  # non-breaking hyphen
+            '\u2012': '-',  # figure dash
+            '\u2015': '-',  # horizontal bar
+        }
+        
+        for char, replacement in replacements.items():
+            text = text.replace(char, replacement)
+            
+        return text
+
     async def process_message(self, websocket, user_text: str, input_mode: str = "voice"):
         """Process user message with speculative TTS execution for faster response
         
@@ -771,6 +792,9 @@ class WebVoiceAgent:
                 if not sentence:
                     continue
                     
+                # Sanitize text to prevent rendering issues (e.g. black boxes for dashes)
+                sentence = self._sanitize_text(sentence)
+                
                 full_response.append(sentence)
                 
                 # Send text progressively

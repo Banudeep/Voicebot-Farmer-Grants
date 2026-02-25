@@ -13,6 +13,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    # Fallback for Python < 3.9 (though unlikely for this project)
+    from dateutil.tz import gettz as ZoneInfo
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
@@ -62,6 +67,16 @@ def set_session_id(session_id: str):
     """Set the current session ID for reference in emails."""
     global _CURRENT_SESSION_ID
     _CURRENT_SESSION_ID = session_id
+
+def _get_formatted_time() -> str:
+    """Get current time formatted for the target timezone (default EST)."""
+    tz_name = os.getenv("TIMEZONE", "America/New_York")
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        tz = None # Fallback to system local
+        
+    return datetime.now(tz).strftime("%B %d, %Y at %I:%M %p")
     
 def _load_static_descriptions():
     """Load pre-calculated form metadata from scraper output."""
@@ -814,10 +829,14 @@ def _fill_pdf_dynamic(form_name: str, form_data: dict) -> bytes:
 
 async def send_form_email(
     recipient_email: str,
-    form_name: str
+    form_name: str,
+    summary_text: str = None,
+    include_transcript: bool = False,
+    user_name: str = None
 ) -> Dict[str, Any]:
     """
     Fill the PDF with collected data and email to customer.
+    Optionally include conversation summary and transcript.
     """
     form_data = _get_form_data(form_name)
     
@@ -854,82 +873,92 @@ async def send_form_email(
     # Count filled fields
     filled_count = len(form_data)
     
-    # Get current date
-    current_date = datetime.now().strftime("%B %d, %Y")
+    # Get formatted time (timezone corrected)
+    current_time_str = _get_formatted_time()
     
     try:
         # Fill PDF
         pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
         
-        # Try to find farmer's name for greeting
-        farmer_name = None
+        # Try to find farmer's name for greeting if not provided
+        farmer_name = user_name
         
-        # Patterns that explicitly ask for name (prioritize full name fields)
-        full_name_patterns = ['full name', 'producer name', 'applicant name', 'your name', 'farmer name']
-        # Combined name+address fields (need to extract name portion)
-        name_address_patterns = ['name and address']
-        
-        # Get schema to check field descriptions
-        schema = _get_form_schema(form_name)
-        
-        def extract_name_from_value(value: str, is_combined_field: bool = False) -> str:
-            """Extract name from field value, handling combined name+address fields."""
-            value_str = str(value).strip()
+        if not farmer_name:
+            # Patterns that explicitly ask for name (prioritize full name fields)
+            full_name_patterns = ['full name', 'producer name', 'applicant name', 'your name', 'farmer name']
+            # Combined name+address fields (need to extract name portion)
+            name_address_patterns = ['name and address']
             
-            if is_combined_field:
-                # For combined "Name and Address" fields, name is usually the first part before comma
-                # Example: "Arcita S., Sendo Rd., Mount Jackson, VA 22842" -> "Arcita S."
-                parts = value_str.split(',')
-                if parts:
-                    # Take first part as name, but verify it doesn't look like a street
-                    first_part = parts[0].strip()
-                    # Skip if it looks like a street address (contains numbers or road keywords)
-                    road_keywords = ['rd', 'road', 'st', 'street', 'ave', 'avenue', 'blvd', 'drive', 'dr', 'lane', 'ln', 'way', 'court', 'ct']
-                    if not any(char.isdigit() for char in first_part):
-                        first_lower = first_part.lower()
-                        if not any(kw in first_lower for kw in road_keywords):
-                            return first_part.title()
-                return None
+            # Get schema to check field descriptions
+            schema = _get_form_schema(form_name)
             
-            return value_str.title()
-        
-        for key, value in form_data.items():
-            if not value or len(str(value)) < 2:
-                continue
+            def extract_name_from_value(value: str, is_combined_field: bool = False) -> str:
+                """Extract name from field value, handling combined name+address fields."""
+                value_str = str(value).strip()
+                
+                if is_combined_field:
+                    # For combined "Name and Address" fields, name is usually the first part before comma
+                    # Example: "Arcita S., Sendo Rd., Mount Jackson, VA 22842" -> "Arcita S."
+                    parts = value_str.split(',')
+                    if parts:
+                        # Take first part as name, but verify it doesn't look like a street
+                        first_part = parts[0].strip()
+                        # Skip if it looks like a street address (contains numbers or road keywords)
+                        road_keywords = ['rd', 'road', 'st', 'street', 'ave', 'avenue', 'blvd', 'drive', 'dr', 'lane', 'ln', 'way', 'court', 'ct']
+                        if not any(char.isdigit() for char in first_part):
+                            first_lower = first_part.lower()
+                            if not any(kw in first_lower for kw in road_keywords):
+                                return first_part.title()
+                    return None
+                
+                return value_str.title()
             
-            key_lower = key.lower()
-            description = ''
-            if isinstance(schema, dict) and key in schema:
-                description = schema[key].get('description', '').lower()
-            
-            # First, check for explicit full name fields (highest priority)
-            if any(pattern in key_lower for pattern in full_name_patterns) or \
-               any(pattern in description for pattern in full_name_patterns):
-                farmer_name = extract_name_from_value(value, is_combined_field=False)
-                if farmer_name:
-                    break
-            
-            # Then, check for combined name+address fields
-            if any(pattern in key_lower for pattern in name_address_patterns) or \
-               any(pattern in description for pattern in name_address_patterns):
-                farmer_name = extract_name_from_value(value, is_combined_field=True)
-                if farmer_name:
-                    break
+            for key, value in form_data.items():
+                if not value or len(str(value)) < 2:
+                    continue
+                
+                key_lower = key.lower()
+                description = ''
+                if isinstance(schema, dict) and key in schema:
+                    description = schema[key].get('description', '').lower()
+                
+                # First, check for explicit full name fields (highest priority)
+                if any(pattern in key_lower for pattern in full_name_patterns) or \
+                   any(pattern in description for pattern in full_name_patterns):
+                    farmer_name = extract_name_from_value(value, is_combined_field=False)
+                    if farmer_name:
+                        break
+                
+                # Then, check for combined name+address fields
+                if any(pattern in key_lower for pattern in name_address_patterns) or \
+                   any(pattern in description for pattern in name_address_patterns):
+                    farmer_name = extract_name_from_value(value, is_combined_field=True)
+                    if farmer_name:
+                        break
         
         # Only include name in greeting if we found a valid name
-        greeting = f"Greetings {farmer_name}," if farmer_name else "Greetings,"
+        greeting = f"Dear {farmer_name}," if farmer_name else "Greetings,"
 
         # Create email with HTML and plain text versions
-        msg = MIMEMultipart("alternative")
+        msg = MIMEMultipart("mixed")
         msg["Subject"] = f"USDA Form Submission: {form_info['title']}"
         msg["From"] = sender_email
         msg["To"] = recipient_email
         
+        # Build Summary Section if text provided
+        summary_section = ""
+        if summary_text:
+            summary_section = f"""
+SUMMARY OF CONVERSATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{summary_text}
+"""
+
         # Plain text version
         plain_body = f"""
 USDA GRANTS ASSISTANT
 Form Submission Confirmation
-Date: {current_date}
+Date: {current_time_str}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -937,11 +966,12 @@ Date: {current_date}
 
 Thank you for using the USDA Voice Assistant to complete your form. Your submission has been processed successfully.
 
+{summary_section}
 FORM DETAILS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Form: {form_info['title']}
 Fields Completed: {filled_count}
-Date Submitted: {current_date}
+Date Submitted: {current_time_str}
 Session ID: {_CURRENT_SESSION_ID or 'Not available'}
 
 ABOUT THIS FORM
@@ -966,11 +996,21 @@ For questions about your submission, contact your local USDA Service Center.
 """
         msg.attach(MIMEText(plain_body, "plain"))
         
-        # Attach PDF
+        # Attach Form PDF
         pdf_attachment = MIMEApplication(pdf_bytes, _subtype="pdf")
         filename = f"Filled_{form_name}"
         pdf_attachment.add_header("Content-Disposition", "attachment", filename=filename)
         msg.attach(pdf_attachment)
+        
+        # Attach Transcript PDF if requested or if summary exists
+        if include_transcript or summary_text:
+            if HAS_REPORTLAB:
+                transcript_bytes = _generate_transcript_pdf(_CHAT_MESSAGES, summary_text)
+                if transcript_bytes:
+                    transcript_file = f"Transcript_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                    trans_att = MIMEApplication(transcript_bytes, _subtype="pdf")
+                    trans_att.add_header("Content-Disposition", "attachment", filename=transcript_file)
+                    msg.attach(trans_att)
         
         # Send
         with smtplib.SMTP(smtp_host, smtp_port) as server:
@@ -996,7 +1036,10 @@ For questions about your submission, contact your local USDA Service Center.
 
 
 async def send_all_forms_email(
-    recipient_email: str
+    recipient_email: str,
+    summary_text: str = None,
+    include_transcript: bool = False,
+    user_name: str = None
 ) -> Dict[str, Any]:
     """
     Send ALL filled forms in a single email.
@@ -1030,7 +1073,7 @@ async def send_all_forms_email(
     # Reuse the static form descriptions loaded at module start
     # Each form entry has 'title', 'purpose', etc.
     
-    current_date = datetime.now().strftime("%B %d, %Y")
+    current_time_str = _get_formatted_time()
     
     try:
         # Create email
@@ -1048,21 +1091,39 @@ async def send_all_forms_email(
         
         forms_summary = "\n\n".join(form_summary_lines)
         
+        # Greeting
+        greeting = f"Dear {user_name}," if user_name else "Dear Farmer,"
+        
+        # Summary Section
+        summary_section = ""
+        if summary_text:
+            summary_section = f"""
+SUMMARY OF CONVERSATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{summary_text}
+"""
+        
         # Plain text body
         plain_body = f"""
 USDA GRANTS ASSISTANT
 Form Submission Confirmation
-Date: {current_date}
+Date: {current_time_str}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Dear Farmer,
+{greeting}
 
 Thank you for using the USDA Voice Assistant. Your form submissions have been processed successfully.
 
+{summary_section}
 FORMS INCLUDED IN THIS EMAIL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {forms_summary}
+
+SESSION DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Session ID: {_CURRENT_SESSION_ID or 'Not available'}
+Date: {current_time_str}
 
 NEXT STEPS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1088,6 +1149,16 @@ USDA is an equal opportunity provider, employer, and lender.
             filename = f"Filled_{form_name}"
             pdf_attachment.add_header("Content-Disposition", "attachment", filename=filename)
             msg.attach(pdf_attachment)
+            
+        # Attach Transcript PDF if requested or if summary exists
+        if include_transcript or summary_text:
+            if HAS_REPORTLAB:
+                transcript_bytes = _generate_transcript_pdf(_CHAT_MESSAGES, summary_text)
+                if transcript_bytes:
+                    transcript_file = f"Transcript_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                    trans_att = MIMEApplication(transcript_bytes, _subtype="pdf")
+                    trans_att.add_header("Content-Disposition", "attachment", filename=transcript_file)
+                    msg.attach(trans_att)
         
         # Send
         with smtplib.SMTP(smtp_host, smtp_port) as server:
@@ -1268,7 +1339,7 @@ SEND_FORM_EMAIL_TOOL = {
     "type": "function",
     "function": {
         "name": "send_form_email",
-        "description": "Fill a single PDF form and email it to the customer.",
+        "description": "Fill a single PDF form and email it to the customer. Can optionally include a conversation summary/transcript.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -1279,6 +1350,18 @@ SEND_FORM_EMAIL_TOOL = {
                 "form_name": {
                     "type": "string",
                     "description": "Name of the form file"
+                },
+                "summary_text": {
+                    "type": "string",
+                    "description": "Optional summary of the conversation to include in the email body."
+                },
+                "include_transcript": {
+                    "type": "boolean",
+                    "description": "Whether to attach the full chat transcript PDF."
+                },
+                "user_name": {
+                    "type": "string",
+                    "description": "Name of the user for the email greeting."
                 }
             },
             "required": ["recipient_email", "form_name"]
@@ -1290,16 +1373,54 @@ SEND_ALL_FORMS_EMAIL_TOOL = {
     "type": "function",
     "function": {
         "name": "send_all_forms_email",
-        "description": "Send ALL filled forms in a single email. Use this when user wants to receive multiple forms together instead of separately.",
+        "description": "Send ALL filled forms in a single email. Use this when user wants to receive multiple forms together instead of separately. Can optionally include a conversation summary/transcript.",
         "parameters": {
             "type": "object",
             "properties": {
                 "recipient_email": {
                     "type": "string",
                     "description": "Customer's email address"
+                },
+                "summary_text": {
+                    "type": "string",
+                    "description": "Optional summary of the conversation to include in the email body."
+                },
+                "include_transcript": {
+                    "type": "boolean",
+                    "description": "Whether to attach the full chat transcript PDF."
+                },
+                "user_name": {
+                    "type": "string",
+                    "description": "Name of the user for the email greeting."
                 }
             },
             "required": ["recipient_email"]
+        }
+    }
+}
+
+SEND_CHAT_SUMMARY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "send_chat_summary",
+        "description": "Send a summary and transcript of the conversation to user's email. Use when user wants to save the info or says goodbye.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "recipient_email": {
+                    "type": "string",
+                    "description": "User's email address"
+                },
+                "summary_text": {
+                    "type": "string",
+                    "description": "A concise 3-5 bullet point summary of what was discussed."
+                },
+                "user_name": {
+                    "type": "string",
+                    "description": "Name of the user for the email greeting."
+                }
+            },
+            "required": ["recipient_email", "summary_text"]
         }
     }
 }
@@ -1354,7 +1475,8 @@ def _generate_transcript_pdf(messages: list, summary_text: str = None) -> bytes:
     story.append(Spacer(1, 12))
     
     # Date/Time
-    date_str = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+    # Date/Time
+    date_str = _get_formatted_time()
     story.append(Paragraph(f"Date: {date_str}", styles["Normal"]))
     if _CURRENT_SESSION_ID:
         story.append(Paragraph(f"Session ID: {_CURRENT_SESSION_ID}", styles["Normal"]))
@@ -1439,7 +1561,8 @@ def _generate_transcript_pdf(messages: list, summary_text: str = None) -> bytes:
 
 async def send_chat_summary(
     recipient_email: str,
-    summary_text: str = None
+    summary_text: str = None,
+    user_name: str = None
 ) -> Dict[str, Any]:
     """
     Send the conversation history to the user's email.
@@ -1464,12 +1587,16 @@ async def send_chat_summary(
             "error": "Email not configured. Set SMTP_USER and SMTP_PASSWORD in .env"
         }
     
-    current_date = datetime.now().strftime("%B %d, %Y")
+    current_time_str = _get_formatted_time()
+    current_date_file = datetime.now().strftime("%Y%m%d")
     
+    # Greeting
+    greeting = f"Dear {user_name}," if user_name else "Dear Farmer,"
+
     try:
         # Create email
         msg = MIMEMultipart("mixed") # mixed content for attachments
-        msg["Subject"] = f"Your USDA Assistant Conversation Summary - {current_date}"
+        msg["Subject"] = f"Your USDA Assistant Conversation Summary - {current_date_file}"
         msg["From"] = sender_email
         msg["To"] = recipient_email
         
@@ -1477,9 +1604,11 @@ async def send_chat_summary(
         body_text = f"""
 USDA GRANTS ASSISTANT
 Conversation Summary
-Date: {datetime.now().strftime("%B %d, %Y at %I:%M %p")}
+Date: {current_time_str}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{greeting}
 
 Thank you for using the USDA Voice Assistant! 
 
@@ -1494,7 +1623,12 @@ SUMMARY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
             
-        body_text += """
+        body_text += f"""
+SESSION DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Session ID: {_CURRENT_SESSION_ID or 'Not available'}
+Date: {current_time_str}
+
 NEXT STEPS
 • Review the attached PDF transcript
 • Contact your local USDA Service Center for follow-up questions
@@ -1514,7 +1648,7 @@ USDA is an equal opportunity provider, employer, and lender.
                 pdf_attachment.add_header(
                     "Content-Disposition", 
                     "attachment", 
-                    filename=f"USDA_Conversation_{current_date.replace(' ', '_').replace(',', '')}.pdf"
+                    filename=f"USDA_Conversation_{current_date_file}.pdf"
                 )
                 msg.attach(pdf_attachment)
             else:
