@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: voice-agent
     ports:
-      - "8080:8080" # Unified HTTP + WebSocket server
+      - "8080:8080" # WebSocket + PDF API server
     environment:
       # Azure OpenAI Configuration (required)
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
@@ -41,6 +41,25 @@ services:
       - ./recordings:/app/recordings
       # Mount Document directory for dynamic forms
       - ./Document:/app/Document
+    restart: unless-stopped
+    networks:
+      - voice-agent-network
+
+  nextjs-ui:
+    build:
+      context: ./web_ui_nextjs
+      dockerfile: Dockerfile
+    container_name: nextjs-ui
+    ports:
+      - "3000:3000" # Next.js UI
+    environment:
+      # Auth.js configuration
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_MICROSOFT_ENTRA_ID_ID=${AUTH_MICROSOFT_ENTRA_ID_ID}
+      - AUTH_MICROSOFT_ENTRA_ID_SECRET=${AUTH_MICROSOFT_ENTRA_ID_SECRET}
+      - AUTH_MICROSOFT_ENTRA_ID_ISSUER=${AUTH_MICROSOFT_ENTRA_ID_ISSUER}
+    depends_on:
+      - voice-agent
     restart: unless-stopped
     networks:
       - voice-agent-network

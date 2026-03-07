@@ -11,7 +11,6 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from aiohttp import web
-from websockets.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from llm_stream import LLMStream
@@ -789,6 +788,19 @@ class WebVoiceAgent:
             filler_cb = send_filler_audio if input_mode == "voice" else None
             
             async for sentence, is_final in self.llm.generate_response_streaming(user_text, filler_callback=filler_cb, input_mode=input_mode):
+                # Flush pending form updates immediately so the UI responds ASAP 
+                # (e.g. opening the form panel before the audio starts playing)
+                try:
+                    from mcp_tools.form_tools import get_pending_form_updates
+                    form_updates = get_pending_form_updates()
+                    if form_updates:
+                        if config.DEBUG:
+                            print(f"📝 Applying {len(form_updates)} form updates during stream")
+                        for update in form_updates:
+                            await self._safe_send(websocket, update)
+                except ImportError:
+                    pass
+
                 if not sentence:
                     continue
                     
@@ -923,31 +935,6 @@ class WebVoiceAgent:
         await self.llm.cleanup()
 
 
-async def serve_static(request):
-    """Serve static files"""
-    _current_dir = Path(__file__).parent
-    static_dir = _current_dir / "web_ui"
-    if not static_dir.exists():
-        static_dir = _current_dir.parent / "web_ui"
-    
-    if request.path == '/' or request.path == '':
-        file_path = static_dir / "voice_agent.html"
-    else:
-        file_path = static_dir / request.path.lstrip('/')
-    
-    if file_path.exists() and file_path.is_file():
-        content_type = 'text/html'
-        if file_path.suffix == '.js':
-            content_type = 'application/javascript'
-        elif file_path.suffix == '.css':
-            content_type = 'text/css'
-        
-        return web.Response(
-            body=file_path.read_bytes(),
-            content_type=content_type
-        )
-    
-    return web.Response(text="File not found", status=404)
 
 
 async def serve_pdf(request):
@@ -993,8 +980,22 @@ async def websocket_handler(request, agent):
     return ws
 
 async def init_http_server(agent):
-    """Start HTTP server with WebSocket support"""
-    app = web.Application()
+    """Start HTTP server with WebSocket + PDF API (no static UI)"""
+    import aiohttp.web_middlewares
+
+    @web.middleware
+    async def cors_middleware(request, handler):
+        """Add CORS headers so the Next.js frontend can connect"""
+        if request.method == 'OPTIONS':
+            response = web.Response()
+        else:
+            response = await handler(request)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
+
+    app = web.Application(middlewares=[cors_middleware])
     
     # WebSocket endpoint
     app.router.add_get('/ws', lambda request: websocket_handler(request, agent))
@@ -1002,12 +1003,9 @@ async def init_http_server(agent):
     # PDF serving endpoint (for document panel viewer)
     app.router.add_get('/pdf/{filename}', serve_pdf)
     
-    # Static file serving (must be last to catch all other paths)
-    app.router.add_get('/{path:.*}', serve_static)
-    
     port = 8080
     host = '0.0.0.0'  # Bind to all interfaces for Docker compatibility
-    print(f"Web interface: http://localhost:{port}")
+    print(f"API server: http://localhost:{port} (WebSocket + PDF)")
     print(f"WebSocket endpoint: ws://localhost:{port}/ws")
     
     runner = web.AppRunner(app)
@@ -1018,23 +1016,6 @@ async def init_http_server(agent):
     await asyncio.Future()
 
 
-async def init_websocket_server(agent):
-    """Start WebSocket server"""
-    port = 3000
-    host = '0.0.0.0'  # Bind to all interfaces for Docker compatibility
-    print(f"WebSocket server: ws://localhost:{port}")
-    
-    # Configure WebSocket server with ping/pong for keepalive
-    async with serve(
-        agent.handle_websocket,
-        host,
-        port,
-        ping_interval=20,  # Send ping every 20 seconds
-        ping_timeout=10,    # Wait 10 seconds for pong
-        close_timeout=10    # Wait 10 seconds for close handshake
-    ):
-        # Also run STT monitor in background
-        await agent.stt_monitor_loop()
 
 
 async def main():
@@ -1051,24 +1032,52 @@ async def main():
     agent = WebVoiceAgent()
     await agent.initialize()
     
+    import subprocess
+    import os
+    
+    # Start Next.js frontend
+    root_dir = Path(__file__).resolve().parent.parent
+    nextjs_dir = root_dir / "web_ui_nextjs"
+    
+    frontend_process = None
+    if nextjs_dir.exists():
+        print()
+        print("Starting Next.js frontend in background...")
+        # Start frontend server, suppress output so it doesn't clutter the terminal
+        frontend_process = subprocess.Popen(
+            "npm run dev",
+            cwd=str(nextjs_dir),
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    
     print()
     print("=" * 70)
     print("All systems ready!")
-    print("Open http://localhost:8080 in your browser")
+    print("Next.js UI: http://localhost:3000")
+    print("Python API: http://localhost:8080 (WebSocket + PDF)")
     print("=" * 70)
     print()
     
     try:
-        # Run both HTTP server (with WebSocket support) and standalone WebSocket server
-        # The standalone WebSocket server on port 3000 is for backward compatibility
-        # The HTTP server also handles WebSocket on /ws for production deployments
+        # Run HTTP server (WebSocket at /ws + PDF) and STT monitor concurrently
         await asyncio.gather(
             init_http_server(agent),
-            init_websocket_server(agent)
+            agent.stt_monitor_loop()
         )
     except KeyboardInterrupt:
         print("\n\n🛑 Shutting down...")
     finally:
+        if frontend_process:
+            print("Shutting down Next.js frontend...")
+            try:
+                if os.name == 'nt':
+                    subprocess.run(['taskkill', '/F', '/T', '/PID', str(frontend_process.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    frontend_process.terminate()
+            except Exception as e:
+                pass
         await agent.cleanup()
 
 if __name__ == "__main__":

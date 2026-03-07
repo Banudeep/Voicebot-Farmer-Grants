@@ -104,7 +104,7 @@ class AudioProcessor extends AudioWorkletProcessor {
   /**
    * Process audio - called by the audio system
    */
-  process(inputs, outputs, parameters) {
+  process(inputs) {
     const input = inputs[0];
     if (!input || !input[0] || input[0].length === 0) {
       return true;

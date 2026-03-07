@@ -40,3 +40,6 @@ Dockerfile
 .dockerignore
 docker-compose.yml
 
+# Next.js (excluded from Python image)
+web_ui_nextjs/node_modules/
+web_ui_nextjs/.next/

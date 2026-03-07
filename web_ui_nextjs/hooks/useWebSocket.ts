@@ -1,0 +1,115 @@
+"use client";
+
+import { useEffect, useRef, useState, useCallback } from "react";
+import { KEEPALIVE_INTERVAL_MS } from "@/lib/constants";
+
+export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
+
+export interface WsMessage {
+  type: string;
+  [key: string]: unknown;
+}
+
+interface UseWebSocketReturn {
+  send: (msg: WsMessage) => void;
+  status: ConnectionStatus;
+  sessionId: string | null;
+  lastMessage: WsMessage | null;
+}
+
+export function useWebSocket(): UseWebSocketReturn {
+  const wsRef = useRef<WebSocket | null>(null);
+  const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [status, setStatus] = useState<ConnectionStatus>("connecting");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [lastMessage, setLastMessage] = useState<WsMessage | null>(null);
+
+  const startKeepAlive = useCallback(() => {
+    if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+    keepAliveRef.current = setInterval(() => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: "ping" }));
+      }
+    }, KEEPALIVE_INTERVAL_MS);
+  }, []);
+
+  const stopKeepAlive = useCallback(() => {
+    if (keepAliveRef.current) {
+      clearInterval(keepAliveRef.current);
+      keepAliveRef.current = null;
+    }
+  }, []);
+
+  const connect = useCallback(() => {
+    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+      wsRef.current.close();
+    }
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const hostname = window.location.hostname;
+    let wsUrl: string;
+
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      wsUrl = `${protocol}//${hostname}:8080/ws`;
+    } else {
+      const currentPort = window.location.port ? `:${window.location.port}` : "";
+      wsUrl = `${protocol}//${hostname}${currentPort}/ws`;
+    }
+
+    console.log(`Connecting to WebSocket: ${wsUrl}`);
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+    setStatus("connecting");
+
+    ws.onopen = () => {
+      console.log("✓ Connected to server");
+      setStatus("connected");
+      startKeepAlive();
+    };
+
+    ws.onmessage = (event) => {
+      const data: WsMessage = JSON.parse(event.data);
+      if (data.type === "session_id") {
+        setSessionId(data.session_id as string);
+      }
+      setLastMessage(data);
+    };
+
+    ws.onerror = () => {
+      console.error("WebSocket error");
+      setStatus("error");
+    };
+
+    ws.onclose = () => {
+      console.log("Disconnected");
+      stopKeepAlive();
+      setStatus("disconnected");
+      setSessionId(null);
+      setTimeout(() => {
+        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
+          connect();
+        }
+      }, 2000);
+    };
+  }, [startKeepAlive, stopKeepAlive]);
+
+  const send = useCallback((msg: WsMessage) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(msg));
+    }
+  }, []);
+
+  useEffect(() => {
+    connect();
+    return () => {
+      stopKeepAlive();
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // prevent reconnect on unmount
+        wsRef.current.close();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { send, status, sessionId, lastMessage };
+}

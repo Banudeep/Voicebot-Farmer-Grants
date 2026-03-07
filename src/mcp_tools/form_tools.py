@@ -204,17 +204,16 @@ async def get_form_fields(form_name: str) -> Dict[str, Any]:
     
     # Open the form panel immediately when form fields are requested
     # This shows the PDF viewer as soon as the first question is about to be asked
-    if _ACTIVE_FORM != form_name:
-        _ACTIVE_FORM = form_name
-        form_data = _get_form_data(form_name)
-        progress = _get_form_progress(form_name)
-        _PENDING_UPDATES.append({
-            'type': 'form_panel',
-            'action': 'open',
-            'form_name': form_name,
-            'fields': dict(form_data),  # Existing fields (if any)
-            'progress': progress  # {filled: N, total: M}
-        })
+    _ACTIVE_FORM = form_name
+    form_data = _get_form_data(form_name)
+    progress = _get_form_progress(form_name)
+    _PENDING_UPDATES.append({
+        'type': 'form_panel',
+        'action': 'open',
+        'form_name': form_name,
+        'fields': dict(form_data),  # Existing fields (if any)
+        'progress': progress  # {filled: N, total: M}
+    })
     
     # Use shared helper to get farmer-relevant fields
     fields_summary = _get_farmer_fields(schema, form_name)
@@ -418,17 +417,15 @@ async def fill_form_field(
 
     form_data = _get_form_data(form_name)
     
-    # Check if this is a new form session (for auto-open)
-    is_new_session = _ACTIVE_FORM != form_name
-    if is_new_session:
-        _ACTIVE_FORM = form_name
-        # Queue panel open event with all current fields
-        _PENDING_UPDATES.append({
-            'type': 'form_panel',
-            'action': 'open',
-            'form_name': form_name,
-            'fields': dict(form_data)  # Existing fields (if any)
-        })
+    # Ensure the panel is open on the UI
+    _ACTIVE_FORM = form_name
+    # Queue panel open event with all current fields
+    _PENDING_UPDATES.append({
+        'type': 'form_panel',
+        'action': 'open',
+        'form_name': form_name,
+        'fields': dict(form_data)  # Existing fields (if any)
+    })
     
     # Update the field with normalized value
     form_data[field_id] = normalized_value
