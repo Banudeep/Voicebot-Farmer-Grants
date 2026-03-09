@@ -18,7 +18,7 @@ except ImportError:
 
 # Tool registry
 _TOOL_DEFINITIONS: List[Dict[str, Any]] = []
-_TOOL_FUNCTIONS: Dict[str, Callable] = []
+_TOOL_FUNCTIONS: Dict[str, Callable] = {}
 
 
 def _load_tool_module(module_name: str, tools_var: str, funcs_var: str) -> tuple:

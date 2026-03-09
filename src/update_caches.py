@@ -25,13 +25,13 @@ def run_script(script_path, description):
             cwd=ROOT_DIR,  # Run from root so path resolution is consistent
             text=True
         )
-        print(f"\n✅ Successfully completed: {description}")
+        print(f"\nSuccessfully completed: {description}")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"\n❌ Error running {description}: {e}")
+        print(f"\n[ERROR] Error running {description}: {e}")
         return False
     except Exception as e:
-        print(f"\n❌ Unexpected error running {description}: {e}")
+        print(f"\n[ERROR] Unexpected error running {description}: {e}")
         return False
 
 async def update_usda_tools():
@@ -46,10 +46,10 @@ async def update_usda_tools():
         
         print("Fetching all USDA reports...")
         reports = await fetch_all_reports()
-        print(f"✅ Successfully cached {len(reports)} USDA reports")
+        print(f"Successfully cached {len(reports)} USDA reports")
         return True
     except Exception as e:
-        print(f"\n❌ Error updating USDA reports: {e}")
+        print(f"\n[ERROR] Error updating USDA reports: {e}")
         return False
 
 async def main():
@@ -94,7 +94,7 @@ async def main():
     if rd_script.exists():
         results["RD Programs"] = run_script(rd_script, "Rural Development Programs Scraper")
     else:
-        print(f"⚠️ Script not found: {rd_script}")
+        print(f"[WARN] Script not found: {rd_script}")
         results["RD Programs"] = False
 
     # 7. Update Program Deadlines
@@ -102,7 +102,7 @@ async def main():
     if deadlines_script.exists():
         results["Program Deadlines"] = run_script(deadlines_script, "Program Deadlines Scraper")
     else:
-        print(f"⚠️ Script not found: {deadlines_script}")
+        print(f"[WARN] Script not found: {deadlines_script}")
         results["Program Deadlines"] = False
 
     # Summary
@@ -111,15 +111,15 @@ async def main():
     print(f"{'='*60}")
     all_success = True
     for job, success in results.items():
-        status = "✅ Success" if success else "❌ Failed"
+        status = "Success" if success else "Failed"
         print(f"{job}: {status}")
         if not success:
             all_success = False
             
     if all_success:
-        print("\n✨ All caches updated successfully!")
+        print("\nAll caches updated successfully!")
     else:
-        print("\n⚠️ Some updates failed. Check logs above.")
+        print("\n[WARN] Some updates failed. Check logs above.")
 
 if __name__ == "__main__":
     asyncio.run(main())

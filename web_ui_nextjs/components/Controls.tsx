@@ -9,6 +9,7 @@ interface ControlsProps {
   mode: InteractionMode;
   isConnected: boolean;
   isRecording: boolean;
+  audioLevel: number;
   onStartRecording: () => void;
   onStopRecording: () => void;
   onSendText: (text: string) => void;
@@ -21,6 +22,7 @@ export default function Controls({
   mode,
   isConnected,
   isRecording,
+  audioLevel,
   onStartRecording,
   onStopRecording,
   onSendText,
@@ -95,18 +97,43 @@ export default function Controls({
       {mode === "voice" && (
         <div className="flex flex-col items-center gap-5 w-full py-2.5">
           <div className="flex items-center justify-center gap-8">
-            <button
-              onClick={handleMicClick}
-              disabled={!isConnected}
-              title={
-                isRecording
-                  ? "Tap to stop recording"
-                  : "Tap to start the Audio call"
-              }
-              className={`mic-btn-large ${isRecording ? "recording" : ""}`}
-            >
-              <Mic size={28} />
-            </button>
+            <div className="mic-btn-wrapper">
+              {/* Audio-reactive ripple rings */}
+              {isRecording && (
+                <>
+                  <span
+                    className="mic-ripple mic-ripple-1"
+                    style={
+                      { "--audio-scale": audioLevel } as React.CSSProperties
+                    }
+                  />
+                  <span
+                    className="mic-ripple mic-ripple-2"
+                    style={
+                      { "--audio-scale": audioLevel } as React.CSSProperties
+                    }
+                  />
+                  <span
+                    className="mic-ripple mic-ripple-3"
+                    style={
+                      { "--audio-scale": audioLevel } as React.CSSProperties
+                    }
+                  />
+                </>
+              )}
+              <button
+                onClick={handleMicClick}
+                disabled={!isConnected}
+                title={
+                  isRecording
+                    ? "Tap to stop recording"
+                    : "Tap to start the Audio call"
+                }
+                className={`mic-btn-large ${isRecording ? "recording" : ""}`}
+              >
+                <Mic size={28} />
+              </button>
+            </div>
           </div>
         </div>
       )}

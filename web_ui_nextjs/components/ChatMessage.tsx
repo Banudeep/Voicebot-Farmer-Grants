@@ -1,18 +1,16 @@
 "use client";
 
 import { marked } from "marked";
-import { Copy, Volume2, Pause, Bot, User } from "lucide-react";
+import { Copy, Volume2, Pause } from "lucide-react";
 import { type ChatMessage } from "@/lib/constants";
 import { showToast } from "./Toast";
+import { AssistantAvatar, UserAvatar } from "./icons";
 
 interface MessageProps {
   message: ChatMessage;
   onListen?: (msg: ChatMessage) => void;
   isListenPlaying?: boolean;
 }
-
-const SVG_ASSISTANT = <Bot size={20} />;
-const SVG_USER = <User size={20} />;
 
 export default function Message({
   message,
@@ -47,15 +45,11 @@ export default function Message({
       className={`flex gap-4 py-4 ${isUser ? "flex-row-reverse msg-animate-right" : "msg-animate-left"}`}
     >
       {/* Avatar */}
-      <div
-        className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm ${
-          isAssistant
-            ? "bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-[var(--color-accent)]"
-            : "bg-[var(--color-accent)] text-white"
-        }`}
-      >
-        {isUser ? SVG_USER : SVG_ASSISTANT}
-      </div>
+      {isUser ? (
+        <UserAvatar className="w-9 h-9 mt-0.5 shadow-sm bg-[var(--color-accent)] text-white" />
+      ) : (
+        <AssistantAvatar className="w-9 h-9 mt-0.5 shadow-sm bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-[var(--color-accent)]" />
+      )}
 
       {/* Content Wrapper */}
       <div

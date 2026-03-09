@@ -77,6 +77,70 @@ def _get_formatted_time() -> str:
         tz = None # Fallback to system local
         
     return datetime.now(tz).strftime("%B %d, %Y at %I:%M %p")
+
+def _get_smtp_config() -> Dict[str, Any]:
+    """Get SMTP configuration from environment. Returns dict with keys: host, port, user, password, sender.
+    Raises ValueError if credentials are missing."""
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    sender_email = os.getenv("SMTP_FROM", smtp_user)
+    
+    if not smtp_user or not smtp_password:
+        raise ValueError("Email not configured. Set SMTP_USER and SMTP_PASSWORD in .env")
+    
+    return {
+        "host": smtp_host,
+        "port": smtp_port,
+        "user": smtp_user,
+        "password": smtp_password,
+        "sender": sender_email
+    }
+
+def _auto_save_pdf(form_name: str, form_data: dict) -> str:
+    """Auto-save the filled PDF to disk. Returns status message."""
+    saved_filename = f"filled_{form_name}"
+    try:
+        pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
+        output_path = DOCUMENT_DIR / saved_filename
+        with open(output_path, "wb") as f:
+            f.write(pdf_bytes)
+        return f" (Progress saved to {saved_filename})"
+    except Exception as e:
+        return f" (Auto-save failed: {str(e)})"
+
+def _ensure_filled_pdf_exists(form_name: str, form_data: dict):
+    """Create the filled_ PDF if it doesn't exist yet.
+    
+    On initial form open, the frontend requests /pdf/filled_<name> but no
+    filled copy exists until the first field is saved. This creates the
+    initial copy (from the original template or with any existing data)
+    so the preview panel can display immediately.
+    """
+    filled_path = DOCUMENT_DIR / f"filled_{form_name}"
+    if not filled_path.exists():
+        try:
+            pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
+            with open(filled_path, "wb") as f:
+                f.write(pdf_bytes)
+        except Exception as e:
+            # Fallback: copy the original PDF as-is
+            original_path = DOCUMENT_DIR / form_name
+            if original_path.exists():
+                import shutil
+                shutil.copy2(original_path, filled_path)
+
+def _attach_transcript_pdf(msg, summary_text: str = None):
+    """Generate and attach transcript PDF to an email message if reportlab is available."""
+    if not HAS_REPORTLAB:
+        return
+    transcript_bytes = _generate_transcript_pdf(_CHAT_MESSAGES, summary_text)
+    if transcript_bytes:
+        transcript_file = f"Transcript_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+        trans_att = MIMEApplication(transcript_bytes, _subtype="pdf")
+        trans_att.add_header("Content-Disposition", "attachment", filename=transcript_file)
+        msg.attach(trans_att)
     
 def _load_static_descriptions():
     """Load pre-calculated form metadata from scraper output."""
@@ -112,7 +176,7 @@ def _get_form_schema(form_name: str) -> Dict[str, Any]:
     pdf_path = DOCUMENT_DIR / form_name
     if not pdf_path.exists():
         # Help the LLM self-correct by listing actual available forms
-        available = [f.name for f in DOCUMENT_DIR.glob("*.pdf")]
+        available = _get_available_forms()
         return {
             "error": f"Form '{form_name}' not found. Available forms: {', '.join(available)}",
             "available_forms": available
@@ -202,10 +266,17 @@ async def get_form_fields(form_name: str) -> Dict[str, Any]:
     if "error" in schema:
         return {"success": False, "error": schema["error"]}
     
-    # Open the form panel immediately when form fields are requested
-    # This shows the PDF viewer as soon as the first question is about to be asked
     _ACTIVE_FORM = form_name
     form_data = _get_form_data(form_name)
+    
+    # Compute farmer-relevant fields FIRST so progress total is correct
+    fields_summary = _get_farmer_fields(schema, form_name)
+    _FARMER_FIELD_COUNT[form_name] = len(fields_summary)
+    
+    # Create the initial filled_ PDF so the preview panel can display it immediately
+    _ensure_filled_pdf_exists(form_name, form_data)
+    
+    # Now get progress (uses the cached field count we just set)
     progress = _get_form_progress(form_name)
     _PENDING_UPDATES.append({
         'type': 'form_panel',
@@ -214,12 +285,6 @@ async def get_form_fields(form_name: str) -> Dict[str, Any]:
         'fields': dict(form_data),  # Existing fields (if any)
         'progress': progress  # {filled: N, total: M}
     })
-    
-    # Use shared helper to get farmer-relevant fields
-    fields_summary = _get_farmer_fields(schema, form_name)
-    
-    # Cache the count so progress bar shows the exact same number
-    _FARMER_FIELD_COUNT[form_name] = len(fields_summary)
             
     return {
         "success": True,
@@ -440,15 +505,7 @@ async def fill_form_field(
     })
     
     # Auto-save the PDF to disk so user can see progress
-    saved_filename = f"filled_{form_name}"
-    try:
-        pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
-        output_path = DOCUMENT_DIR / saved_filename
-        with open(output_path, "wb") as f:
-            f.write(pdf_bytes)
-        save_status = f" (Progress saved to {saved_filename})"
-    except Exception as e:
-        save_status = f" (Auto-save failed: {str(e)})"
+    save_status = _auto_save_pdf(form_name, form_data)
     
     # Include original vs normalized if they differ
     result = {
@@ -783,14 +840,9 @@ def _fill_pdf_dynamic(form_name: str, form_data: dict) -> bytes:
     except Exception as e:
         print(f"Warning: Could not set NeedAppearances: {e}")
     
-    # Create update dict
-    update_dict = {}
-    for k, v in form_data.items():
-        update_dict[k] = v
-        
-    if update_dict:
+    if form_data:
         # Update values
-        writer.update_page_form_field_values(writer.pages[0], update_dict)
+        writer.update_page_form_field_values(writer.pages[0], form_data)
         
         # Post-processing: Enforce auto-font size on updated fields
         # This iterates through page annotations to find the fields we just updated
@@ -844,18 +896,10 @@ async def send_form_email(
         }
     
     # Get SMTP settings
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    sender_email = os.getenv("SMTP_FROM", smtp_user)
-    
-    if not smtp_user or not smtp_password:
-        return {
-            "success": False,
-            "error": "Email not configured. Set SMTP_USER and SMTP_PASSWORD in .env"
-        }
-    
+    try:
+        smtp = _get_smtp_config()
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
     
     # Get form info or use defaults
     if form_name in STATIC_FORM_DESCRIPTIONS:
@@ -939,7 +983,7 @@ async def send_form_email(
         # Create email with HTML and plain text versions
         msg = MIMEMultipart("mixed")
         msg["Subject"] = f"USDA Form Submission: {form_info['title']}"
-        msg["From"] = sender_email
+        msg["From"] = smtp["sender"]
         msg["To"] = recipient_email
         
         # Build Summary Section if text provided
@@ -1001,19 +1045,13 @@ For questions about your submission, contact your local USDA Service Center.
         
         # Attach Transcript PDF if requested or if summary exists
         if include_transcript or summary_text:
-            if HAS_REPORTLAB:
-                transcript_bytes = _generate_transcript_pdf(_CHAT_MESSAGES, summary_text)
-                if transcript_bytes:
-                    transcript_file = f"Transcript_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
-                    trans_att = MIMEApplication(transcript_bytes, _subtype="pdf")
-                    trans_att.add_header("Content-Disposition", "attachment", filename=transcript_file)
-                    msg.attach(trans_att)
+            _attach_transcript_pdf(msg, summary_text)
         
         # Send
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
+        with smtplib.SMTP(smtp["host"], smtp["port"]) as server:
             server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(sender_email, recipient_email, msg.as_string())
+            server.login(smtp["user"], smtp["password"])
+            server.sendmail(smtp["sender"], recipient_email, msg.as_string())
         
         
         # NOTE: We intentionally do NOT clear form data here.
@@ -1055,20 +1093,10 @@ async def send_all_forms_email(
         }
     
     # Get SMTP settings
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    sender_email = os.getenv("SMTP_FROM", smtp_user)
-    
-    if not smtp_user or not smtp_password:
-        return {
-            "success": False,
-            "error": "Email not configured. Set SMTP_USER and SMTP_PASSWORD in .env"
-        }
-    
-    # Reuse the static form descriptions loaded at module start
-    # Each form entry has 'title', 'purpose', etc.
+    try:
+        smtp = _get_smtp_config()
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
     
     current_time_str = _get_formatted_time()
     
@@ -1076,7 +1104,7 @@ async def send_all_forms_email(
         # Create email
         msg = MIMEMultipart("mixed")
         msg["Subject"] = f"USDA Form Submission: {len(forms_with_data)} Form(s) Attached"
-        msg["From"] = sender_email
+        msg["From"] = smtp["sender"]
         msg["To"] = recipient_email
         
         # Build form summary for the email body
@@ -1149,19 +1177,13 @@ USDA is an equal opportunity provider, employer, and lender.
             
         # Attach Transcript PDF if requested or if summary exists
         if include_transcript or summary_text:
-            if HAS_REPORTLAB:
-                transcript_bytes = _generate_transcript_pdf(_CHAT_MESSAGES, summary_text)
-                if transcript_bytes:
-                    transcript_file = f"Transcript_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
-                    trans_att = MIMEApplication(transcript_bytes, _subtype="pdf")
-                    trans_att.add_header("Content-Disposition", "attachment", filename=transcript_file)
-                    msg.attach(trans_att)
+            _attach_transcript_pdf(msg, summary_text)
         
         # Send
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
+        with smtplib.SMTP(smtp["host"], smtp["port"]) as server:
             server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(sender_email, recipient_email, msg.as_string())
+            server.login(smtp["user"], smtp["password"])
+            server.sendmail(smtp["sender"], recipient_email, msg.as_string())
         
         return {
             "success": True,
@@ -1183,7 +1205,7 @@ def cleanup_session_files():
         if not DOCUMENT_DIR.exists():
             return
             
-        print(f"🧹 Cleaning up session files in {DOCUMENT_DIR}...")
+        print(f"Cleaning up session files in {DOCUMENT_DIR}...")
         count = 0
         for file_path in DOCUMENT_DIR.glob("filled_*.pdf"):
             try:
@@ -1194,12 +1216,12 @@ def cleanup_session_files():
                 print(f"   Failed to delete {file_path.name}: {e}")
         
         if count > 0:
-            print(f"✓ Removed {count} temporary form file(s)")
+            print(f"Removed {count} temporary form file(s)")
         else:
             print("   No temporary files found to clean up")
             
     except Exception as e:
-        print(f"⚠️ Error during file cleanup: {e}")
+        print(f"[WARN] Error during file cleanup: {e}")
 
 # --- UI Panel Support ---
 
@@ -1236,28 +1258,9 @@ async def update_form_field_from_ui(
     form_data[field_id] = value
     
     # Auto-save the PDF
-    try:
-        pdf_bytes = _fill_pdf_dynamic(form_name, form_data)
-        output_path = DOCUMENT_DIR / f"filled_{form_name}"
-        with open(output_path, "wb") as f:
-            f.write(pdf_bytes)
-    except Exception:
-        pass  # Silently fail auto-save for UI edits
+    _auto_save_pdf(form_name, form_data)
     
     return {"success": True, "field_id": field_id, "value": value}
-
-def get_current_form_state() -> Dict[str, Any]:
-    """Get current form state for initial panel load."""
-    global _ACTIVE_FORM
-    if not _ACTIVE_FORM:
-        return {"active": False}
-    
-    form_data = _get_form_data(_ACTIVE_FORM)
-    return {
-        "active": True,
-        "form_name": _ACTIVE_FORM,
-        "fields": dict(form_data)
-    }
 
 # --- Tool Definitions ---
 
@@ -1392,32 +1395,6 @@ SEND_ALL_FORMS_EMAIL_TOOL = {
                 }
             },
             "required": ["recipient_email"]
-        }
-    }
-}
-
-SEND_CHAT_SUMMARY_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "send_chat_summary",
-        "description": "Send a summary and transcript of the conversation to user's email. Use when user wants to save the info or says goodbye.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "recipient_email": {
-                    "type": "string",
-                    "description": "User's email address"
-                },
-                "summary_text": {
-                    "type": "string",
-                    "description": "A concise 3-5 bullet point summary of what was discussed."
-                },
-                "user_name": {
-                    "type": "string",
-                    "description": "Name of the user for the email greeting."
-                }
-            },
-            "required": ["recipient_email", "summary_text"]
         }
     }
 }
@@ -1572,17 +1549,10 @@ async def send_chat_summary(
         }
     
     # Get SMTP settings
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    sender_email = os.getenv("SMTP_FROM", smtp_user)
-    
-    if not smtp_user or not smtp_password:
-        return {
-            "success": False,
-            "error": "Email not configured. Set SMTP_USER and SMTP_PASSWORD in .env"
-        }
+    try:
+        smtp = _get_smtp_config()
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
     
     current_time_str = _get_formatted_time()
     current_date_file = datetime.now().strftime("%Y%m%d")
@@ -1594,7 +1564,7 @@ async def send_chat_summary(
         # Create email
         msg = MIMEMultipart("mixed") # mixed content for attachments
         msg["Subject"] = f"Your USDA Assistant Conversation Summary - {current_date_file}"
-        msg["From"] = sender_email
+        msg["From"] = smtp["sender"]
         msg["To"] = recipient_email
         
         # Message Body
@@ -1636,29 +1606,14 @@ USDA is an equal opportunity provider, employer, and lender.
 """
         msg.attach(MIMEText(body_text, "plain"))
         
-        # Parse Chat History for Plain Text fallback (optional) or just use PDF
-        # Generating PDF
-        if HAS_REPORTLAB:
-            pdf_bytes = _generate_transcript_pdf(_CHAT_MESSAGES, summary_text)
-            if pdf_bytes:
-                pdf_attachment = MIMEApplication(pdf_bytes, _subtype="pdf")
-                pdf_attachment.add_header(
-                    "Content-Disposition", 
-                    "attachment", 
-                    filename=f"USDA_Conversation_{current_date_file}.pdf"
-                )
-                msg.attach(pdf_attachment)
-            else:
-                 msg.attach(MIMEText("\n[Error: Could not generate PDF transcript]", "plain"))
-        else:
-            msg.attach(MIMEText("\n[Note: PDF generation unavailable]", "plain"))
-            
+        # Attach transcript PDF
+        _attach_transcript_pdf(msg, summary_text)
         
         # Send
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
+        with smtplib.SMTP(smtp["host"], smtp["port"]) as server:
             server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(sender_email, recipient_email, msg.as_string())
+            server.login(smtp["user"], smtp["password"])
+            server.sendmail(smtp["sender"], recipient_email, msg.as_string())
         
         return {
             "success": True,
@@ -1686,6 +1641,10 @@ SEND_CHAT_SUMMARY_TOOL = {
                 "summary_text": {
                     "type": "string",
                     "description": "A concise 3-5 bullet point summary of what was discussed, decisions made, and follow-up items. GENERATE THIS YOURSELF based on the conversation history."
+                },
+                "user_name": {
+                    "type": "string",
+                    "description": "Name of the user for the email greeting."
                 }
             },
             "required": ["recipient_email", "summary_text"]

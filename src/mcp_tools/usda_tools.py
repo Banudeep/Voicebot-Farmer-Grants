@@ -8,6 +8,7 @@ import base64
 import json
 import os
 import re
+import traceback
 from pathlib import Path
 from typing import Any, Optional, Tuple
 from datetime import datetime, timedelta
@@ -22,8 +23,7 @@ _RAW_KEY = os.getenv("USDA_API_KEY", "")
 USDA_API_KEY = "".join(_RAW_KEY.strip("'\"").split()) if _RAW_KEY else None
 
 # Cache configuration
-# Path: src/mcp_tools/usda_tools.py -> src/mcp_tools -> src -> root
-CACHE_DIR = Path(__file__).parent.parent.parent / "cache"
+from mcp_tools.utils import CACHE_DIR
 CACHE_DIR.mkdir(exist_ok=True)
 REPORTS_CACHE_FILE = CACHE_DIR / "usda_reports_cache.json"
 CACHE_EXPIRY_HOURS = 24  # Refresh cache every 24 hours
@@ -47,7 +47,7 @@ async def fetch_api_endpoint(endpoint: str) -> dict:
     
     # Print exact HTTP call details
     print("\n" + "=" * 80)
-    print("🌐 USDA API HTTP CALL")
+    print("USDA API HTTP CALL")
     print("=" * 80)
     print(f"Method: GET")
     print(f"URL: {url}")
@@ -63,7 +63,7 @@ async def fetch_api_endpoint(endpoint: str) -> dict:
             
             # Catch Auth errors immediately
             if response.status_code in (401, 403):
-                print(f"❌ API Authentication Failed: HTTP {response.status_code}")
+                print(f"[ERROR] API Authentication Failed: HTTP {response.status_code}")
                 return {
                     "success": False,
                     "url": url,
@@ -292,7 +292,7 @@ async def get_corn_soybean_prices(slug_id: int = 3167, date: Optional[str] = Non
     last_error = None
     
     # Phase 1: Try last 7 days (1 week) - check all concurrently
-    print(f"🔍 Phase 1: Checking last 7 days concurrently starting from {format_date_for_api(start_date)}")
+    print(f"Phase 1: Checking last 7 days concurrently starting from {format_date_for_api(start_date)}")
     date_requested_str = date if date else "today"
     result = await check_date_range_concurrently(endpoint, headers, slug_id, start_date, 8, commodity, "week", date_requested_str)
     
@@ -306,7 +306,7 @@ async def get_corn_soybean_prices(slug_id: int = 3167, date: Optional[str] = Non
     # Let's do a quick single-day check first to validate Auth!
     
     # Quick Auth Check with today's date (or start_date)
-    print("🔑 Verifying API Authentication...")
+    print("Verifying API Authentication...")
     auth_check_date = format_date_for_api(start_date)
     has_access, _, auth_err = await check_date_for_data(endpoint, headers, auth_check_date, commodity)
     if not has_access and auth_err and "AUTH_ERROR" in auth_err:
@@ -321,7 +321,7 @@ async def get_corn_soybean_prices(slug_id: int = 3167, date: Optional[str] = Non
         return result
     
     # Phase 2: Search the entire current year day by day (concurrently in batches)
-    print(f"🔍 Phase 2: Searching entire current year ({start_date.year}) day by day")
+    print(f"Phase 2: Searching entire current year ({start_date.year}) day by day")
     current_year = start_date.year
     year_start = datetime(current_year, 1, 1)
     
@@ -370,7 +370,7 @@ async def get_corn_soybean_prices(slug_id: int = 3167, date: Optional[str] = Non
                     }
     
     # Phase 3: Search previous years going backwards
-    print(f"🔍 Phase 3: Searching previous years going backwards")
+    print(f"Phase 3: Searching previous years going backwards")
     max_years_back = 10  # Limit to 10 years to avoid infinite loops
     
     for year_offset in range(1, max_years_back + 1):  # Start from 1 since we already checked current year
@@ -452,23 +452,22 @@ def load_reports_cache() -> Optional[list]:
             try:
                 cache_time = datetime.strptime(cache_time_str, "%Y-%m-%dT%H:%M:%S.%f")
             except ValueError:
-                print(f"⚠️ Invalid cache timestamp format: {cache_time_str}")
+                print(f"[WARN] Invalid cache timestamp format: {cache_time_str}")
                 return None
         
         time_diff = datetime.now() - cache_time
         if time_diff > timedelta(hours=CACHE_EXPIRY_HOURS):
-            print(f"⚠️ Cache expired ({time_diff.total_seconds() / 3600:.1f} hours old)")
+            print(f"[WARN] Cache expired ({time_diff.total_seconds() / 3600:.1f} hours old)")
             return None
         
         reports = cache_data.get("reports", [])
         if not reports:
-            print("⚠️ Cache file exists but contains no reports")
+            print("[WARN] Cache file exists but contains no reports")
             return None
         
         return reports
     except Exception as e:
-        print(f"⚠️ Error loading cache: {e}")
-        import traceback
+        print(f"[WARN] Error loading cache: {e}")
         traceback.print_exc()
         return None
 
@@ -482,9 +481,9 @@ def save_reports_cache(reports: list):
         }
         with open(REPORTS_CACHE_FILE, 'w', encoding='utf-8') as f:
             json.dump(cache_data, f, indent=2, ensure_ascii=False)
-        print(f"✓ Cached {len(reports)} reports to {REPORTS_CACHE_FILE}")
+        print(f"Cached {len(reports)} reports to {REPORTS_CACHE_FILE}")
     except Exception as e:
-        print(f"⚠️ Error saving cache: {e}")
+        print(f"[WARN] Error saving cache: {e}")
 
 
 async def fetch_all_reports() -> list:
@@ -518,9 +517,9 @@ async def find_state_reports(state: Optional[str] = None) -> dict:
     cache_was_used = bool(cached_reports)
     
     if cache_was_used:
-        print(f"✓ Using cache with {len(cached_reports)} reports")
+        print(f"Using cache with {len(cached_reports)} reports")
     else:
-        print("📥 Cache miss or expired - fetching from API...")
+        print("Cache miss or expired - fetching from API...")
         cached_reports = await fetch_all_reports()
     
     # If still no reports, fall back to marketTypes endpoint
@@ -615,7 +614,7 @@ async def find_state_reports(state: Optional[str] = None) -> dict:
     
     # If no matches found in cache, try API search as fallback
     if not filtered_reports:
-        print(f"🔍 No matches in cache for '{state}', searching API...")
+        print(f"No matches in cache for '{state}', searching API...")
         result = await fetch_api_endpoint("marketTypes/Point%20of%20Sale%20-%20Grain")
         
         if result.get("success") and result.get("data"):

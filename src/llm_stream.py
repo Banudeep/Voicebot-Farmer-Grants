@@ -3,8 +3,10 @@ LLM Streaming Module
 Streaming text generation using Azure OpenAI Responses API
 """
 import asyncio
+import inspect
 import json
 import random
+import traceback
 from pathlib import Path
 import config
 
@@ -94,28 +96,6 @@ class LLMStream:
         if not config.ENABLE_TOOLS:
             return []
         return self.all_tools
-    
-    def _format_tools_for_azure(self, tools):
-        """Convert tools format for Azure OpenAI (nested function structure)"""
-        if not tools:
-            return []
-        
-        formatted_tools = []
-        for tool in tools:
-            if "function" in tool:
-                formatted_tools.append(tool)
-            else:
-                formatted_tool = {
-                    "type": tool.get("type", "function"),
-                    "function": {
-                        "name": tool.get("name", ""),
-                        "description": tool.get("description", ""),
-                        "parameters": tool.get("parameters", {})
-                    }
-                }
-                formatted_tools.append(formatted_tool)
-        
-        return formatted_tools
     
     def _format_tools_for_responses_api(self, tools):
         """Convert tools to Responses API flat format."""
@@ -220,11 +200,6 @@ class LLMStream:
                 "Checking recent news...",
                 "Looking up updates.",
             ],
-            # Deadline tools
-            'get_state_ranking_dates': [
-                "Checking deadlines...",
-                "Looking up those dates.",
-            ],
         }
         
         # Default fillers for unknown tools
@@ -252,7 +227,6 @@ class LLMStream:
             tool_func = self.tool_functions[tool_name]
             
             # Validate required arguments by checking function signature
-            import inspect
             sig = inspect.signature(tool_func)
             required_params = [p.name for p in sig.parameters.values() 
                              if p.default == inspect.Parameter.empty and p.name != 'self']
@@ -288,7 +262,6 @@ class LLMStream:
             if "missing" in error_msg.lower() and "required" in error_msg.lower():
                 logger.error(f"Tool '{tool_name}' argument error: {error_msg}")
                 logger.debug(f"Provided arguments: {arguments}")
-                import inspect
                 sig = inspect.signature(tool_func)
                 return json.dumps({
                     "error": f"Missing required arguments for '{tool_name}': {error_msg}",
@@ -302,7 +275,6 @@ class LLMStream:
             logger.error(error_msg)
             logger.debug(f"Arguments: {arguments}")
             if config.DEBUG:
-                import traceback
                 logger.exception("Tool execution traceback")
             return json.dumps({"error": error_msg, "arguments": arguments})
     
@@ -477,12 +449,6 @@ class LLMStream:
                         
                         tool_result = await self._execute_tool(tool_name, tool_args)
                         
-                        # Truncate large results
-                        MAX_TOOL_CONTENT_SIZE = 8000
-                        if isinstance(tool_result, str) and len(tool_result) > MAX_TOOL_CONTENT_SIZE:
-                            logger.warning(f"Truncating large tool result ({len(tool_result)} chars)")
-                            tool_result = tool_result[:MAX_TOOL_CONTENT_SIZE] + f"\n... [truncated]"
-                        
                         # Add to conversation history
                         self.conversation_history.append({
                             "role": "tool",
@@ -573,80 +539,6 @@ class LLMStream:
                 logger.debug(f"Request URL: {url}")
                 raise
     
-    async def generate_response(self, user_message: str, stream_callback=None, filler_callback=None):
-        """Generate response with optional streaming and filler audio
-        
-        Args:
-            user_message: The user's message
-            stream_callback: Callback for streaming text
-            filler_callback: Async callback to send filler audio before tool execution
-        """
-        # Add user message to history
-        self.conversation_history.append({
-            "role": "user",
-            "content": user_message
-        })
-        
-        # Keep conversation history manageable
-        if len(self.conversation_history) > config.MAX_CONVERSATION_HISTORY:
-            self.conversation_history = self.conversation_history[-config.MAX_CONVERSATION_HISTORY:]
-        
-        # Prepare messages
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            *self.conversation_history
-        ]
-        
-        # Get tools
-        tools = await self._get_tools()
-        
-        try:
-            # Use Responses API (httpx required)
-            if not HAS_HTTPX:
-                raise RuntimeError("httpx is required for Azure OpenAI. Install with: pip install httpx")
-            return await self._azure_responses_api(messages, tools, stream_callback, filler_callback)
-                
-        except Exception as e:
-            error_msg = str(e)
-            error_details = ""
-            status_code = None
-            
-            # Extract more details from OpenAI library errors
-            if hasattr(e, 'status_code'):
-                status_code = e.status_code
-            elif hasattr(e, 'response') and hasattr(e.response, 'status_code'):
-                status_code = e.response.status_code
-            
-            # Try to extract error body
-            if hasattr(e, 'body'):
-                try:
-                    if isinstance(e.body, dict):
-                        error_details = str(e.body)
-                    else:
-                        error_details = json.loads(e.body) if isinstance(e.body, str) else str(e.body)
-                except:
-                    error_details = str(e.body)
-            elif hasattr(e, 'response') and hasattr(e.response, 'json'):
-                try:
-                    error_details = e.response.json()
-                except:
-                    pass
-            
-            # Format error details
-            if error_details:
-                if isinstance(error_details, dict):
-                    error_details = str(error_details)
-                error_details = f"Error code: {status_code} - {error_details}" if status_code else f"Error details: {error_details}"
-            elif status_code:
-                error_details = f"Error code: {status_code}"
-            
-            # Print detailed error information
-            print(f"❌ LLM error: {error_msg}")
-            if error_details:
-                print(f"   {error_details}")
-            
-            return "I encountered an error. Please try asking your question again."
-    
     async def generate_response_streaming(self, user_message: str, filler_callback=None, input_mode: str = "voice"):
         """
         Generate response with sentence-level streaming for faster TTS.
@@ -729,7 +621,7 @@ class LLMStream:
     async def cleanup(self):
         """Clean up resources"""
         if config.DEBUG:
-            print("🧹 LLM cleaned up")
+            print("LLM cleaned up")
 
 async def test_llm():
     """Test LLM generation"""
@@ -738,11 +630,13 @@ async def test_llm():
     llm = LLMStream()
     await llm.initialize()
     
-    response = await llm.generate_response("Hello! How are you?")
-    print(f"✓ Response: {response}")
+    full = []
+    async for sentence, is_final in llm.generate_response_streaming("Hello! How are you?"):
+        full.append(sentence)
+    print(f"Response: {' '.join(full)}")
     
     await llm.cleanup()
-    print("✓ LLM test complete")
+    print("LLM test complete")
 
 if __name__ == "__main__":
     asyncio.run(test_llm())

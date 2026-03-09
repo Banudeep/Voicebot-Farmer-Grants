@@ -8,35 +8,60 @@ Data sources:
   - cache/program_deadlines_comprehensive.json (16 programs)
 """
 
-import json
-from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-# Logging
-try:
-    from logging_config import get_logger
-    logger = get_logger("voicebot.tools.programs")
-except ImportError:
-    import logging
-    logger = logging.getLogger("voicebot.tools.programs")
+from mcp_tools.utils import (
+    CACHE_DIR,
+    SERVICE_CENTER_LOCATOR_URL,
+    get_tool_logger,
+    load_json_cache,
+    truncate_summary,
+)
 
-# Caching
-try:
-    from cache_manager import cached
-    HAS_CACHE = True
-except ImportError:
-    HAS_CACHE = False
-    def cached(name, ttl=None):
-        def decorator(func):
-            return func
-        return decorator
+logger = get_tool_logger("voicebot.tools.programs")
 
 # Data paths
-# Path: src/mcp_tools/unified_programs_tools.py -> src/mcp_tools -> src -> root
-CACHE_DIR = Path(__file__).parent.parent.parent / "cache"
 FSA_DATA_PATH = CACHE_DIR / "fsa_programs_comprehensive.json"
 RD_DATA_PATH = CACHE_DIR / "rd_programs_comprehensive.json"
 DEADLINES_DATA_PATH = CACHE_DIR / "program_deadlines_comprehensive.json"
+
+# Source configurations: (path, source_code, source_full, field_map)
+# field_map keys: name, url, description, summary_field, deadline
+_SOURCES = [
+    {
+        "path": FSA_DATA_PATH,
+        "source": "FSA",
+        "source_full": "Farm Service Agency",
+        "name_keys": ["title", "detail_title"],
+        "url_key": "url",
+        "desc_key": "full_description",
+        "summary_key": "full_description",
+        "deadline_key": "important_dates",
+    },
+    {
+        "path": RD_DATA_PATH,
+        "source": "RD",
+        "source_full": "Rural Development",
+        "name_keys": ["title", "detail_title"],
+        "url_key": "url",
+        "desc_key": "full_description",
+        "summary_key": "full_description",
+        "deadline_key": None,
+    },
+    {
+        "path": DEADLINES_DATA_PATH,
+        "source": "Deadline",
+        "source_full": "Active Program Deadline",
+        "name_keys": ["program_name", "name"],
+        "url_key": "url",
+        "url_fallback": "detail_url",
+        "desc_key": "detailed_description",
+        "desc_fallback": "description",
+        "summary_key": "description",
+        "deadline_key": "deadline",
+        "deadline_fallback": "application_deadline",
+    },
+]
 
 # Cache for loaded data
 _all_programs: List[Dict] = []
@@ -52,71 +77,51 @@ def _load_all_programs() -> List[Dict]:
     
     programs = []
     
-    # Load FSA Programs
-    if FSA_DATA_PATH.exists():
+    for src_cfg in _SOURCES:
+        raw_data = load_json_cache(src_cfg["path"], fallback=[])
+        # Handle wrapper object structure {"programs": [...]}
+        if isinstance(raw_data, dict) and "programs" in raw_data:
+            raw_data = raw_data["programs"]
+        if not isinstance(raw_data, list):
+            continue
+
         try:
-            with open(FSA_DATA_PATH, 'r', encoding='utf-8') as f:
-                fsa_data = json.load(f)
-                # Handle wrapper object structure {"programs": [...]}
-                if isinstance(fsa_data, dict) and "programs" in fsa_data:
-                    fsa_data = fsa_data["programs"]
-                for program in fsa_data:
-                    programs.append({
-                        "name": program.get("title", program.get("detail_title", "")),
-                        "source": "FSA",
-                        "source_full": "Farm Service Agency",
-                        "url": program.get("url", ""),
-                        "description": program.get("full_description", ""),
-                        "summary": program.get("full_description", "")[:300] + "..." if len(program.get("full_description", "")) > 300 else program.get("full_description", ""),
-                        "deadline": program.get("important_dates", None),
-                        "raw_data": program
-                    })
+            for program in raw_data:
+                # Resolve name from prioritized keys
+                name = ""
+                for k in src_cfg["name_keys"]:
+                    name = program.get(k, "")
+                    if name:
+                        break
+
+                desc = program.get(src_cfg["desc_key"], "")
+                if not desc and "desc_fallback" in src_cfg:
+                    desc = program.get(src_cfg["desc_fallback"], "")
+
+                url = program.get(src_cfg["url_key"], "")
+                if not url and "url_fallback" in src_cfg:
+                    url = program.get(src_cfg["url_fallback"], "")
+
+                summary_text = program.get(src_cfg["summary_key"], "")
+
+                deadline = None
+                if src_cfg.get("deadline_key"):
+                    deadline = program.get(src_cfg["deadline_key"])
+                    if not deadline and "deadline_fallback" in src_cfg:
+                        deadline = program.get(src_cfg["deadline_fallback"])
+
+                programs.append({
+                    "name": name,
+                    "source": src_cfg["source"],
+                    "source_full": src_cfg["source_full"],
+                    "url": url,
+                    "description": desc,
+                    "summary": truncate_summary(summary_text),
+                    "deadline": deadline,
+                    "raw_data": program,
+                })
         except Exception as e:
-            logger.warning(f"Could not load FSA programs: {e}")
-    
-    # Load RD Programs
-    if RD_DATA_PATH.exists():
-        try:
-            with open(RD_DATA_PATH, 'r', encoding='utf-8') as f:
-                rd_data = json.load(f)
-                # Handle wrapper object structure {"programs": [...]}
-                if isinstance(rd_data, dict) and "programs" in rd_data:
-                    rd_data = rd_data["programs"]
-                for program in rd_data:
-                    programs.append({
-                        "name": program.get("title", program.get("detail_title", "")),
-                        "source": "RD",
-                        "source_full": "Rural Development",
-                        "url": program.get("url", ""),
-                        "description": program.get("full_description", ""),
-                        "summary": program.get("full_description", "")[:300] + "..." if len(program.get("full_description", "")) > 300 else program.get("full_description", ""),
-                        "deadline": None,
-                        "raw_data": program
-                    })
-        except Exception as e:
-            logger.warning(f"Could not load RD programs: {e}")
-    
-    # Load Program Deadlines
-    if DEADLINES_DATA_PATH.exists():
-        try:
-            with open(DEADLINES_DATA_PATH, 'r', encoding='utf-8') as f:
-                deadlines_data = json.load(f)
-                # Handle wrapper object structure {"programs": [...]}
-                if isinstance(deadlines_data, dict) and "programs" in deadlines_data:
-                    deadlines_data = deadlines_data["programs"]
-                for program in deadlines_data:
-                    programs.append({
-                        "name": program.get("program_name", program.get("name", "")),
-                        "source": "Deadline",
-                        "source_full": "Active Program Deadline",
-                        "url": program.get("url", program.get("detail_url", "")),
-                        "description": program.get("detailed_description", program.get("description", "")),
-                        "summary": program.get("description", "")[:300] + "..." if len(program.get("description", "")) > 300 else program.get("description", ""),
-                        "deadline": program.get("deadline", program.get("application_deadline", None)),
-                        "raw_data": program
-                    })
-        except Exception as e:
-            logger.warning(f"Could not load program deadlines: {e}")
+            logger.warning(f"Could not load {src_cfg['source']} programs: {e}")
     
     _all_programs = programs
     
@@ -244,7 +249,7 @@ async def search_all_programs(
         },
         "matches_by_source": sources_found,
         "results": results,
-        "service_center_locator": "https://www.farmers.gov/service-center-locator"
+        "service_center_locator": SERVICE_CENTER_LOCATOR_URL
     }
 
 
@@ -279,7 +284,7 @@ async def get_program_details(
                 "deadline": program.get("deadline"),
                 "raw_data": program.get("raw_data", {})
             },
-            "service_center_locator": "https://www.farmers.gov/service-center-locator"
+            "service_center_locator": SERVICE_CENTER_LOCATOR_URL
         }
     
     # Try partial match
@@ -305,14 +310,14 @@ async def get_program_details(
                 "raw_data": best_match.get("raw_data", {})
             },
             "note": f"Partial match for '{program_name}'",
-            "service_center_locator": "https://www.farmers.gov/service-center-locator"
+            "service_center_locator": SERVICE_CENTER_LOCATOR_URL
         }
     
     return {
         "success": False,
         "error": f"Program '{program_name}' not found.",
         "suggestion": "Try using search_all_programs to find the correct program name.",
-        "service_center_locator": "https://www.farmers.gov/service-center-locator"
+        "service_center_locator": SERVICE_CENTER_LOCATOR_URL
     }
 
 

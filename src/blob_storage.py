@@ -4,6 +4,7 @@ Uploads chat transcripts and audio recordings to Azure Blob Storage.
 """
 import json
 import io
+import traceback
 import wave
 from datetime import datetime
 from typing import Optional
@@ -28,16 +29,16 @@ class BlobStorageLogger:
         self._initialized = False
         
         if not self.enabled:
-            print("ℹ️  Blob logging disabled (set ENABLE_BLOB_LOGGING=true to enable)")
+            print("[INFO] Blob logging disabled (set ENABLE_BLOB_LOGGING=true to enable)")
             return
         
         if not HAS_BLOB_STORAGE:
-            print("⚠️ azure-storage-blob not installed. Run: pip install azure-storage-blob")
+            print("[WARN] azure-storage-blob not installed. Run: pip install azure-storage-blob")
             self.enabled = False
             return
         
         if not config.AZURE_STORAGE_CONNECTION_STRING:
-            print("⚠️ AZURE_STORAGE_CONNECTION_STRING not set - blob logging disabled")
+            print("[WARN] AZURE_STORAGE_CONNECTION_STRING not set - blob logging disabled")
             self.enabled = False
             return
         
@@ -60,11 +61,11 @@ class BlobStorageLogger:
                 pass  # Container likely exists
 
             self._initialized = True
-            print(f"✓ Blob Storage connected")
+            print(f"Blob Storage connected")
             print(f"  Transcripts → {config.AZURE_BLOB_CONTAINER_TRANSCRIPTS}")
             print(f"  Recordings  → {config.AZURE_BLOB_CONTAINER_RECORDINGS}")
         except Exception as e:
-            print(f"⚠️ Failed to connect to Blob Storage: {e}")
+            print(f"[WARN] Failed to connect to Blob Storage: {e}")
             self.enabled = False
     
     def _get_blob_path(self, session_id: str, extension: str) -> str:
@@ -96,7 +97,7 @@ class BlobStorageLogger:
         
         if not messages:
             if config.DEBUG:
-                print("ℹ️ No messages to upload - skipping transcript")
+                print("[INFO] No messages to upload - skipping transcript")
             return False
         
         try:
@@ -124,13 +125,12 @@ class BlobStorageLogger:
                 content_settings=ContentSettings(content_type="application/json")
             )
             
-            print(f"📤 Transcript uploaded: {blob_path} ({len(messages)} messages)")
+            print(f"Transcript uploaded: {blob_path} ({len(messages)} messages)")
             return True
             
         except Exception as e:
-            print(f"⚠️ Failed to upload transcript: {e}")
+            print(f"[WARN] Failed to upload transcript: {e}")
             if config.DEBUG:
-                import traceback
                 traceback.print_exc()
             return False
     
@@ -156,7 +156,7 @@ class BlobStorageLogger:
         
         if not audio_chunks:
             if config.DEBUG:
-                print("ℹ️ No audio to upload - skipping recording")
+                print("[INFO] No audio to upload - skipping recording")
             return False
         
         try:
@@ -193,13 +193,12 @@ class BlobStorageLogger:
             
             # Calculate duration for logging
             duration = len(audio_data) / (sample_rate * 2)
-            print(f"📤 Recording uploaded: {blob_path} ({duration:.1f}s, {len(wav_bytes)} bytes)")
+            print(f"Recording uploaded: {blob_path} ({duration:.1f}s, {len(wav_bytes)} bytes)")
             return True
             
         except Exception as e:
-            print(f"⚠️ Failed to upload recording: {e}")
+            print(f"[WARN] Failed to upload recording: {e}")
             if config.DEBUG:
-                import traceback
                 traceback.print_exc()
             return False
 

@@ -69,7 +69,7 @@ def load_system_prompt():
                 if prompt_data and 'system' in prompt_data:
                     return prompt_data['system'].strip()
         except Exception as e:
-            print(f"⚠️ Error loading prompt from {USDA_PROMPT_FILE}: {e}")
+            print(f"[WARN] Error loading prompt from {USDA_PROMPT_FILE}: {e}")
             print("  Using default system prompt")
     
     # Default fallback prompt
@@ -106,9 +106,31 @@ def validate_config():
         raise ValueError(f"Configuration errors: {', '.join(errors)}")
     
     if VERBOSE:
-        print("✓ Configuration validated")
+        print("Configuration validated")
+
+
+def create_speech_config():
+    """Create and return an Azure SpeechConfig instance.
+
+    Uses AZURE_SPEECH_ENDPOINT when available, otherwise falls back to
+    subscription key + region.  Call *validate_config()* first to ensure
+    the required variables are set.
+    """
+    import azure.cognitiveservices.speech as speechsdk
+
+    if AZURE_SPEECH_ENDPOINT:
+        speech_cfg = speechsdk.SpeechConfig(
+            endpoint=AZURE_SPEECH_ENDPOINT,
+            subscription=AZURE_SPEECH_KEY,
+        )
+    else:
+        speech_cfg = speechsdk.SpeechConfig(
+            subscription=AZURE_SPEECH_KEY,
+            region=AZURE_SPEECH_REGION,
+        )
+    return speech_cfg
 
 
 if __name__ == "__main__":
     validate_config()
-    print("✓ All required API keys are configured")
+    print("All required API keys are configured")

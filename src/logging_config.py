@@ -106,14 +106,14 @@ def get_api_logger() -> logging.Logger:
 
 # Emoji mappings for log levels (for visual debugging)
 EMOJI_MAP = {
-    "DEBUG": "🔍",
-    "INFO": "ℹ️",
-    "WARNING": "⚠️",
-    "ERROR": "❌",
-    "CRITICAL": "🚨",
-    "SUCCESS": "✅",
-    "TOOL": "🔧",
-    "API": "🌐",
+    "DEBUG": "[DEBUG]",
+    "INFO": "[INFO]",
+    "WARNING": "[WARN]",
+    "ERROR": "[ERROR]",
+    "CRITICAL": "[CRITICAL]",
+    "SUCCESS": "[OK]",
+    "TOOL": "[TOOL]",
+    "API": "[API]",
 }
 
 
@@ -131,4 +131,4 @@ if __name__ == "__main__":
     logger.info("Info message")
     logger.warning("Warning message")
     logger.error("Error message")
-    print("✓ Logging configuration test complete")
+    print("Logging configuration test complete")

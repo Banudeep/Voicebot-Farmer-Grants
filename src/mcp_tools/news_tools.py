@@ -8,18 +8,17 @@ Provides HYBRID search over state news articles:
 Data source: cache/state_news_deep.json + cache/state_news_index.json (if RAG enabled)
 """
 
-import json
-from pathlib import Path
 from typing import Dict, Any, Optional, List
-import re
 
-# Logging
-try:
-    from logging_config import get_logger
-    logger = get_logger("voicebot.tools.news")
-except ImportError:
-    import logging
-    logger = logging.getLogger("voicebot.tools.news")
+from mcp_tools.utils import (
+    CACHE_DIR,
+    load_json_cache,
+    load_county_db,
+    normalize_state,
+    get_tool_logger,
+)
+
+logger = get_tool_logger("voicebot.tools.news")
 
 # Optional dependencies for RAG search
 HAS_OPENAI = False
@@ -38,31 +37,19 @@ except ImportError:
     OpenAI = None
 
 # Paths
-# Path: src/mcp_tools/news_tools.py -> src/mcp_tools -> src -> root
-BASE_DIR = Path(__file__).parent.parent.parent
-CACHE_DIR = BASE_DIR / "cache"
 NEWS_DATA_PATH = CACHE_DIR / "state_news_deep.json"
 NEWS_INDEX_PATH = CACHE_DIR / "state_news_index.json"
-COUNTY_DB_PATH = CACHE_DIR / "us_counties.json"
-
-# Embedding model
-EMBED_MODEL = "text-embedding-3-small"
 
 # Cached data
 _NEWS_CACHE: Optional[Dict] = None
 _NEWS_INDEX_CACHE: Optional[Dict] = None
-_COUNTY_DB_CACHE: Optional[Dict] = None
 
 
 def _load_news_data() -> Dict[str, Any]:
     """Load and cache news data"""
     global _NEWS_CACHE
     if _NEWS_CACHE is None:
-        if NEWS_DATA_PATH.exists():
-            with NEWS_DATA_PATH.open("r", encoding="utf-8") as f:
-                _NEWS_CACHE = json.load(f)
-        else:
-            _NEWS_CACHE = {"states": {}}
+        _NEWS_CACHE = load_json_cache(NEWS_DATA_PATH, fallback={"states": {}})
     return _NEWS_CACHE
 
 
@@ -70,37 +57,8 @@ def _load_news_index() -> Dict[str, Any]:
     """Load RAG index if available"""
     global _NEWS_INDEX_CACHE
     if _NEWS_INDEX_CACHE is None:
-        if NEWS_INDEX_PATH.exists():
-            with NEWS_INDEX_PATH.open("r", encoding="utf-8") as f:
-                _NEWS_INDEX_CACHE = json.load(f)
-        else:
-            _NEWS_INDEX_CACHE = {"chunks": []}
+        _NEWS_INDEX_CACHE = load_json_cache(NEWS_INDEX_PATH, fallback={"chunks": []})
     return _NEWS_INDEX_CACHE
-
-
-def _load_county_db() -> Dict[str, Any]:
-    """Load county database for state name lookups"""
-    global _COUNTY_DB_CACHE
-    if _COUNTY_DB_CACHE is None:
-        if COUNTY_DB_PATH.exists():
-            with COUNTY_DB_PATH.open("r", encoding="utf-8") as f:
-                _COUNTY_DB_CACHE = json.load(f)
-        else:
-            _COUNTY_DB_CACHE = {"states": {}}
-    return _COUNTY_DB_CACHE
-
-
-def _normalize_state(state_input: str, county_db: Dict) -> Optional[str]:
-    """Convert state name to 2-letter code"""
-    state_upper = state_input.upper().strip()
-    if state_upper in county_db.get('states', {}):
-        return state_upper
-    
-    state_lower = state_input.lower().strip()
-    for code, info in county_db.get('states', {}).items():
-        if info.get('name', '').lower() == state_lower:
-            return code
-    return None
 
 
 def _cosine_similarity(a: List[float], b: List[float]) -> float:
@@ -215,12 +173,12 @@ async def search_state_news(
     """
     try:
         news_data = _load_news_data()
-        county_db = _load_county_db()
+        county_db = load_county_db()
         
         # Normalize state if provided
         state_code = None
         if state:
-            state_code = _normalize_state(state, county_db)
+            state_code = normalize_state(state, county_db)
             if not state_code:
                 return {
                     "success": False,
@@ -362,6 +320,6 @@ if __name__ == "__main__":
             print(f"   Summary: {r['summary'][:150]}...")
         
         print("\n" + "=" * 60)
-        print("✅ Tests complete!")
+        print("Tests complete!")
     
     asyncio.run(test())

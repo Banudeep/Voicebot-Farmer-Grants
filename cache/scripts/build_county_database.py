@@ -143,29 +143,29 @@ async def main():
     CACHE_DIR.mkdir(exist_ok=True)
     
     # Fetch FIPS data
-    print("\n📡 Fetching FIPS county data...")
+    print("\nFetching FIPS county data...")
     fips_data = await fetch_fips_data()
-    print(f"  ✓ Retrieved data for {len(fips_data)} states/territories")
+    print(f"  Retrieved data for {len(fips_data)} states/territories")
     
     # Process data
-    print("\n🔧 Processing county data...")
+    print("\nProcessing county data...")
     county_db = process_fips_data(fips_data)
-    print(f"  ✓ Processed {county_db['metadata']['total_counties']} counties")
-    print(f"  ✓ Across {county_db['metadata']['total_states']} states/territories")
+    print(f"  Processed {county_db['metadata']['total_counties']} counties")
+    print(f"  Across {county_db['metadata']['total_states']} states/territories")
     
     # Save to file
     with OUTPUT_FILE.open("w", encoding="utf-8") as f:
         json.dump(county_db, f, indent=2)
-    print(f"\n✅ Saved to {OUTPUT_FILE}")
+    print(f"\nSaved to {OUTPUT_FILE}")
     
     # Print sample
-    print("\n📊 Sample data:")
+    print("\nSample data:")
     for state in ["IA", "TX", "CA"]:
         if state in county_db["counties_by_state"]:
             counties = county_db["counties_by_state"][state]
             print(f"\n  {state} ({len(counties)} counties):")
             for county in counties[:3]:
-                print(f"    • {county['name']} -> {county['slug']}")
+                print(f"    - {county['name']} -> {county['slug']}")
     
     print("\n" + "=" * 60)
 

@@ -5,6 +5,7 @@ Uses browser for audio capture (more reliable than PyAudio)
 import asyncio
 import json
 import base64
+import traceback
 import wave
 import struct
 import uuid
@@ -91,7 +92,7 @@ class WebVoiceAgent:
         self.last_transcript = None
         self.last_processed_time = 0
         self.llm.clear_history()
-        print("🔄 Session reset - cleared processed text history and LLM context")
+        print("Session reset - cleared processed text history and LLM context")
     
     async def _upload_session_data(self, websocket):
         """Upload session transcript and recording to blob storage on disconnect"""
@@ -127,7 +128,7 @@ class WebVoiceAgent:
             return
         
         current_time = asyncio.get_event_loop().time()
-        print(f"\n💬 Complete speech ({trigger_type}): {complete_text}")
+        print(f"\nComplete speech ({trigger_type}): {complete_text}")
         
         # Update tracking
         self.last_transcript = complete_text
@@ -140,6 +141,7 @@ class WebVoiceAgent:
         self.is_processing = True
         websocket = list(self.active_connections)[0]
         
+        await self._safe_send(websocket, {'type': 'clear_audio'})
         await self._safe_send(websocket, {'type': 'transcript', 'text': complete_text})
         
         self.current_processing_task = asyncio.create_task(
@@ -151,7 +153,7 @@ class WebVoiceAgent:
         try:
             await self.current_processing_task
         except asyncio.CancelledError:
-            print("🚫 Processing cancelled by user")
+            print("Processing cancelled by user")
         finally:
             self.is_processing = False
             self.current_processing_task = None
@@ -165,9 +167,9 @@ class WebVoiceAgent:
         # Show recording status
         if config.ENABLE_RECORDINGS:
             recordings_path = Path(__file__).parent / "recordings"
-            print(f"✓ Audio recordings enabled (saving to: {recordings_path})")
+            print(f"Audio recordings enabled (saving to: {recordings_path})")
         else:
-            print("ℹ️  Audio recordings disabled (set ENABLE_RECORDINGS=true to enable)")
+            print("[INFO] Audio recordings disabled (set ENABLE_RECORDINGS=true to enable)")
         
         await self.llm.initialize()
         await self.stt.connect()
@@ -231,7 +233,7 @@ class WebVoiceAgent:
             'started_at': datetime.now(),
             'messages': []
         }
-        print(f"📝 Session initialized: {session_id}")
+        print(f"Session initialized: {session_id}")
         
         # Send session ID to frontend for display
         await self._safe_send(websocket, {
@@ -260,11 +262,13 @@ class WebVoiceAgent:
                     if msg_type == 'session_start':
                         # Reset session state but keep the same session ID for the connection
                         self._reset_session()
-                        
+                        self.asked_to_repeat = False
+                    
+                    elif msg_type == 'mic_activated':
+                        # Mic button clicked — send greeting on first activation
                         if websocket not in self.greeted_connections:
                             await self.send_greeting(websocket)
                             self.greeted_connections.add(websocket)
-                        self.asked_to_repeat = False
                     
                     elif msg_type == 'input_audio_buffer.append':
                         # Audio from browser
@@ -272,7 +276,7 @@ class WebVoiceAgent:
                         audio_bytes = base64.b64decode(audio_base64)
                         
                         if config.VERBOSE:
-                            print(f"📊 Received audio: {len(audio_bytes)} bytes")
+                            print(f"Received audio: {len(audio_bytes)} bytes")
                         
                         # Store audio for recording (only if recordings are enabled AND not opted out)
                         if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
@@ -299,9 +303,9 @@ class WebVoiceAgent:
                                 value=data.get('value', '')
                             )
                             if config.DEBUG:
-                                print(f"📝 UI edit: {data.get('field_id')} = {data.get('value')}")
+                                print(f"UI edit: {data.get('field_id')} = {data.get('value')}")
                         except Exception as e:
-                            print(f"⚠️ Form field update error: {e}")
+                            print(f"[WARN] Form field update error: {e}")
                     
                     elif msg_type == 'ping':
                         # WebSocket keep-alive ping from client
@@ -314,7 +318,7 @@ class WebVoiceAgent:
                         if voice_name:
                             self.tts.set_voice(voice_name)
                             if config.DEBUG:
-                                print(f"✓ Voice setting updated to: {voice_name}")
+                                print(f"Voice setting updated to: {voice_name}")
                     
                     elif msg_type == 'request_tts':
                         # Manual request for TTS (e.g. playing old messages with new voice)
@@ -335,17 +339,17 @@ class WebVoiceAgent:
                             await self._safe_send(websocket, {'type': 'audio_complete'})
                     
                 except json.JSONDecodeError:
-                    print("⚠️ Invalid JSON received")
+                    print("[WARN] Invalid JSON received")
                     await self._safe_send(websocket, {
                         'type': 'error',
                         'message': 'Invalid message format'
                     })
                 except ConnectionClosed:
                     # Connection closed during message processing
-                    print("⚠️ Connection closed during message processing")
+                    print("[WARN] Connection closed during message processing")
                     break
                 except Exception as e:
-                    print(f"⚠️ Error processing message: {e}")
+                    print(f"[WARN] Error processing message: {e}")
                     # Don't disconnect on errors, just log and continue
                     await self._safe_send(websocket, {
                         'type': 'error',
@@ -353,13 +357,12 @@ class WebVoiceAgent:
                     })
             
         except ConnectionClosed as e:
-            print(f"⚠️ Browser disconnected: {e.code} - {e.reason if e.reason else 'Normal closure'}")
+            print(f"[WARN] Browser disconnected: {e.code} - {e.reason if e.reason else 'Normal closure'}")
         except asyncio.CancelledError:
-            print("⚠️ WebSocket handler cancelled")
+            print("[WARN] WebSocket handler cancelled")
             raise
         except Exception as e:
-            print(f"❌ WebSocket error: {e}")
-            import traceback
+            print(f"[ERROR] WebSocket error: {e}")
             traceback.print_exc()
         finally:
             # Upload transcript and recording to blob storage
@@ -414,7 +417,7 @@ class WebVoiceAgent:
                         # Ignore late-arriving transcripts (refined versions from Azure Speech)
                         if self._is_late_transcript(current_time):
                             time_since = current_time - self.last_processed_time
-                            print(f"🔄 Ignoring late transcript ({time_since:.1f}s after processing started): '{transcript}'")
+                            print(f"Ignoring late transcript ({time_since:.1f}s after processing started): '{transcript}'")
                             continue
                         
                         # Check if identical to last processed transcript within 5 seconds
@@ -422,25 +425,52 @@ class WebVoiceAgent:
                         if (self.last_transcript and 
                             transcript.strip().lower() == self.last_transcript.strip().lower() and 
                             current_time - self.last_processed_time < 5.0):
-                            print(f"🔄 Ignoring duplicate input: '{transcript}'")
+                            print(f"Ignoring duplicate input: '{transcript}'")
                             is_duplicate = True
                         
                         if is_duplicate:
                             continue
                         
+                        # Filter out short noises/echoes globally so they don't break the frontend's audio queue
+                        is_short = len(transcript) <= 15
+                        clean_text = ''.join(c.lower() for c in transcript if c.isalpha() or c.isspace()).strip()
+                        valid_interrupt_words = {"stop", "wait", "hold", "pause", "no", "yes", "okay", "ok", "cancel", "thanks", "hello", "hi", "quit", "enough", "hey"}
+                        spoken_words = set(clean_text.split())
+                        
+                        if is_short and not spoken_words.intersection(valid_interrupt_words):
+                            print(f"Ignoring short noise/echo: '{transcript}'")
+                            continue
+
+                        # Software AEC Anti-Echo Check 
+                        # If the microphone merely heard the bot's own voice playback, it will match the last assistant message
+                        if hasattr(self, 'llm') and len(self.llm.conversation_history) > 0:
+                            last_msg = self.llm.conversation_history[-1]
+                            if last_msg.get('role') == 'assistant':
+                                bot_text_lower = ''.join(c.lower() for c in last_msg.get('content', '') if c.isalpha() or c.isspace())
+                                # If STT transcript is contained in what the bot just said (or vice versa)
+                                if len(clean_text) > 15 and (clean_text in bot_text_lower or bot_text_lower in clean_text):
+                                    print(f"Ignoring bot echo (Software AEC): '{transcript}'")
+                                    continue
+
                         # Only interrupt if it's NOT a duplicate
                         if self.is_processing and self.current_processing_task:
-                            print("⏹️ User interrupted - cancelling current response")
+                            print("User interrupted - cancelling current response")
                             self.current_processing_task.cancel()
                             self.current_processing_task = None
                             self.is_processing = False
+                        
+                        # Always stop frontend audio when user genuinely speaks
+                        # (all echo/noise filters have already passed at this point)
+                        if self.active_connections:
+                            websocket = list(self.active_connections)[0]
+                            await self._safe_send(websocket, {'type': 'clear_audio'})
                         
                         self.current_speech = transcript  # Replace, don't append
                         self.last_transcript_time = current_time
                         self.asked_to_repeat = False  # Reset repeat flag
                         
                         if config.DEBUG:
-                            print(f"📝 Hearing: {transcript} (Final: {is_final_semantic})")
+                            print(f"Hearing: {transcript} (Final: {is_final_semantic})")
                         
                         # Show live transcript in UI (this triggers audio stop in browser)
                         if self.active_connections:
@@ -453,7 +483,7 @@ class WebVoiceAgent:
                             
                         # FAST SEMANTIC TRIGGER - process immediately
                         if is_final_semantic:
-                            print(f"⚡ FAST TRIGGER: Semantic match for '{transcript}'")
+                            print(f"FAST TRIGGER: Semantic match for '{transcript}'")
                             await self._process_complete_speech(transcript, "Semantic")
                 
                 except asyncio.TimeoutError:
@@ -490,8 +520,7 @@ class WebVoiceAgent:
                                 self.last_transcript_time = None
                 
             except Exception as e:
-                print(f"⚠️ STT monitor error: {e}")
-                import traceback
+                print(f"[WARN] STT monitor error: {e}")
                 traceback.print_exc()
                 self.is_processing = False
                 await asyncio.sleep(0.1)
@@ -511,29 +540,18 @@ class WebVoiceAgent:
             # Synthesize and send audio
             audio_data = await self.tts.synthesize(greeting)
             if audio_data:
-                # Capture AI audio for recording
-                if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
-                    if websocket not in self.audio_recordings:
-                        self.audio_recordings[websocket] = []
-                    self.audio_recordings[websocket].append(audio_data)
-
-                chunk_size = 8192
-                for i in range(0, len(audio_data), chunk_size):
-                    chunk = audio_data[i:i + chunk_size]
-                    if not await self._safe_send(websocket, {
-                        'type': 'audio_chunk',
-                        'audio': base64.b64encode(chunk).decode('utf-8')
-                    }):
-                        return  # Connection closed
+                self._capture_audio(websocket, audio_data)
+                if not await self._send_audio_chunks(websocket, audio_data):
+                    return  # Connection closed
                 
                 await self._safe_send(websocket, {
                     'type': 'audio_complete'
                 })
                 
                 if config.DEBUG:
-                    print(f"✓ Greeting sent")
+                    print(f"Greeting sent")
         except Exception as e:
-            print(f"⚠️ Error sending greeting: {e}")
+            print(f"[WARN] Error sending greeting: {e}")
     
     async def _safe_send(self, websocket, message):
         """Safely send message to WebSocket, handling closed connections"""
@@ -545,7 +563,7 @@ class WebVoiceAgent:
             
             if is_closed:
                 if config.DEBUG:
-                    print("⚠️ Cannot send: WebSocket is closed")
+                    print("[WARN] Cannot send: WebSocket is closed")
                 return False
             
             # Handle both websockets library and aiohttp
@@ -564,17 +582,35 @@ class WebVoiceAgent:
             )
             return True
         except asyncio.TimeoutError:
-            print("⚠️ WebSocket send timeout")
+            print("[WARN] WebSocket send timeout")
             return False
         except ConnectionClosed:
             if config.DEBUG:
-                print("⚠️ Cannot send: Connection closed")
+                print("[WARN] Cannot send: Connection closed")
             return False
         except Exception as e:
             if config.DEBUG:
-                print(f"⚠️ WebSocket send error: {type(e).__name__}: {e}")
+                print(f"[WARN] WebSocket send error: {type(e).__name__}: {e}")
             return False
     
+    async def _send_audio_chunks(self, websocket, audio_data: bytes) -> bool:
+        """Send audio data to the client in chunks. Returns False if connection closed."""
+        chunk_size = 8192
+        for i in range(0, len(audio_data), chunk_size):
+            chunk = audio_data[i:i + chunk_size]
+            if not await self._safe_send(websocket, {
+                'type': 'audio_chunk',
+                'audio': base64.b64encode(chunk).decode('utf-8')
+            }):
+                return False
+        return True
+
+    def _capture_audio(self, websocket, audio_data: bytes):
+        """Capture audio for recording if enabled and user hasn't opted out."""
+        if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
+            if websocket not in self.audio_recordings:
+                self.audio_recordings[websocket] = []
+            self.audio_recordings[websocket].append(audio_data)
 
     def _log_message(self, websocket, role: str, text: str):
         """Log message to session history"""
@@ -625,7 +661,7 @@ class WebVoiceAgent:
                 if websocket in self.audio_recordings:
                     del self.audio_recordings[websocket]
                 
-                print(f"🚫 User opted out of recording")
+                print(f"User opted out of recording")
                 await self._safe_send(websocket, {
                     'type': 'response_text',
                     'text': "Okay, I've stopped recording this session and deleted any audio captured so far."
@@ -634,14 +670,7 @@ class WebVoiceAgent:
                 # Speak the confirmation (but don't record it)
                 confirmation_audio = await self.tts.synthesize("Okay, I've stopped recording this session.")
                 if confirmation_audio:
-                     # Send audio without appending to recording buffer
-                    chunk_size = 8192
-                    for i in range(0, len(confirmation_audio), chunk_size):
-                        chunk = confirmation_audio[i:i + chunk_size]
-                        await self._safe_send(websocket, {
-                            'type': 'audio_chunk',
-                            'audio': base64.b64encode(chunk).decode('utf-8')
-                        })
+                    await self._send_audio_chunks(websocket, confirmation_audio)
                     await self._safe_send(websocket, {'type': 'audio_complete'})
                 return
 
@@ -657,7 +686,7 @@ class WebVoiceAgent:
                 set_chat_messages(self.session_data[websocket]['messages'])
             
             if config.DEBUG:
-                print("🤖 Thinking...")
+                print("Thinking...")
             
             # Use streaming response for faster time-to-first-audio
             full_response = []
@@ -676,7 +705,7 @@ class WebVoiceAgent:
                     await tts_queue.put((order, audio_data, sentence))
                 except Exception as e:
                     if config.DEBUG:
-                        print(f"⚠️ TTS error for sentence {order}: {e}")
+                        print(f"[WARN] TTS error for sentence {order}: {e}")
                     await tts_queue.put((order, None, sentence))
             
             async def send_audio_in_order():
@@ -698,22 +727,11 @@ class WebVoiceAgent:
                             audio, sent = pending.pop(expected_order)
                             if audio:
                                 if config.DEBUG and not first_audio_sent:
-                                    print(f"🔊 Starting TTS for first sentence...")
+                                    print(f"Starting TTS for first sentence...")
                                     first_audio_sent = True
                                 
-                                # Capture AI audio for recording
-                                if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
-                                    if websocket not in self.audio_recordings:
-                                        self.audio_recordings[websocket] = []
-                                    self.audio_recordings[websocket].append(audio)
-
-                                chunk_size = 8192
-                                for i in range(0, len(audio), chunk_size):
-                                    chunk = audio[i:i + chunk_size]
-                                    await self._safe_send(websocket, {
-                                        'type': 'audio_chunk',
-                                        'audio': base64.b64encode(chunk).decode('utf-8')
-                                    })
+                                self._capture_audio(websocket, audio)
+                                await self._send_audio_chunks(websocket, audio)
                             expected_order += 1
                     except asyncio.TimeoutError:
                         # Check if all tasks are done and queue is empty
@@ -723,24 +741,13 @@ class WebVoiceAgent:
                             while expected_order in pending:
                                 audio, _ = pending.pop(expected_order)
                                 if audio:
-                                    # Capture pending audio too
-                                    if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
-                                        if websocket not in self.audio_recordings:
-                                            self.audio_recordings[websocket] = []
-                                        self.audio_recordings[websocket].append(audio)
-                                        
-                                    chunk_size = 8192
-                                    for i in range(0, len(audio), chunk_size):
-                                        chunk = audio[i:i + chunk_size]
-                                        await self._safe_send(websocket, {
-                                            'type': 'audio_chunk',
-                                            'audio': base64.b64encode(chunk).decode('utf-8')
-                                        })
+                                    self._capture_audio(websocket, audio)
+                                    await self._send_audio_chunks(websocket, audio)
                                 expected_order += 1
                             break
                     except Exception as e:
                         if config.DEBUG:
-                            print(f"⚠️ Audio sender error: {e}")
+                            print(f"[WARN] Audio sender error: {e}")
                         break
             
             # Filler callback for instant audio feedback during tool execution
@@ -761,25 +768,14 @@ class WebVoiceAgent:
                 try:
                     audio_data = await self.tts.synthesize(filler_text)
                     if audio_data:
-                        # Capture filler audio for recording
-                        if config.ENABLE_RECORDINGS and websocket not in self.recording_opt_out:
-                            if websocket not in self.audio_recordings:
-                                self.audio_recordings[websocket] = []
-                            self.audio_recordings[websocket].append(audio_data)
-                            
+                        self._capture_audio(websocket, audio_data)
                         if config.DEBUG:
-                            print(f"🎙️ Filler: {filler_text}")
-                        chunk_size = 8192
-                        for i in range(0, len(audio_data), chunk_size):
-                            chunk = audio_data[i:i + chunk_size]
-                            await self._safe_send(websocket, {
-                                'type': 'audio_chunk',
-                                'audio': base64.b64encode(chunk).decode('utf-8')
-                            })
+                            print(f"Filler: {filler_text}")
+                        await self._send_audio_chunks(websocket, audio_data)
                         first_audio_sent = True
                 except Exception as e:
                     if config.DEBUG:
-                        print(f"⚠️ Filler audio error: {e}")
+                        print(f"[WARN] Filler audio error: {e}")
             
             # Start audio sender task (runs concurrently)
             audio_sender = asyncio.create_task(send_audio_in_order())
@@ -795,7 +791,7 @@ class WebVoiceAgent:
                     form_updates = get_pending_form_updates()
                     if form_updates:
                         if config.DEBUG:
-                            print(f"📝 Applying {len(form_updates)} form updates during stream")
+                            print(f"Applying {len(form_updates)} form updates during stream")
                         for update in form_updates:
                             await self._safe_send(websocket, update)
                 except ImportError:
@@ -843,7 +839,7 @@ class WebVoiceAgent:
                 form_updates = get_pending_form_updates()
                 if form_updates:
                     if config.DEBUG:
-                        print(f"📝 Applying {len(form_updates)} form updates from LLM")
+                        print(f"Applying {len(form_updates)} form updates from LLM")
                     for update in form_updates:
                         await self._safe_send(websocket, update)
             except ImportError:
@@ -855,7 +851,7 @@ class WebVoiceAgent:
                 self._log_message(websocket, "assistant", complete_response)
                 
                 if config.DEBUG:
-                    print(f"💬 AI: {complete_response[:100]}..." if len(complete_response) > 100 else f"💬 AI: {complete_response}")
+                    print(f"AI: {complete_response[:100]}..." if len(complete_response) > 100 else f"AI: {complete_response}")
 
             # Send completion signal
             await self._safe_send(websocket, {
@@ -863,8 +859,7 @@ class WebVoiceAgent:
             })
         
         except Exception as e:
-            print(f"❌ Error processing message: {e}")
-            import traceback
+            print(f"[ERROR] Error processing message: {e}")
             traceback.print_exc()
             
             # Send error to client
@@ -911,14 +906,13 @@ class WebVoiceAgent:
             # Calculate duration
             duration = len(audio_data) / (config.STT_SAMPLE_RATE * 2)  # 2 bytes per sample
             
-            print(f"💾 Recording saved: {filepath} ({duration:.2f} seconds, {len(audio_data)} bytes)")
+            print(f"Recording saved: {filepath} ({duration:.2f} seconds, {len(audio_data)} bytes)")
             
             # Clear the recording buffer
             del self.audio_recordings[websocket]
             
         except Exception as e:
-            print(f"⚠️ Error saving recording: {e}")
-            import traceback
+            print(f"[WARN] Error saving recording: {e}")
             traceback.print_exc()
             # Still remove the recording to prevent memory issues
             if websocket in self.audio_recordings:
@@ -1067,7 +1061,7 @@ async def main():
             agent.stt_monitor_loop()
         )
     except KeyboardInterrupt:
-        print("\n\n🛑 Shutting down...")
+        print("\n\nShutting down...")
     finally:
         if frontend_process:
             print("Shutting down Next.js frontend...")
@@ -1084,4 +1078,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n👋 Goodbye!")
+        print("\nGoodbye!")

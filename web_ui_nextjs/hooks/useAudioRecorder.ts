@@ -1,23 +1,32 @@
 import { useState, useRef, useCallback } from "react";
 import { arrayBufferToBase64 } from "@/lib/constants";
+import { getSharedAudioContext } from "./sharedAudio";
 
 export function useAudioRecorder(
   send: (data: any) => void,
-  sessionStartedRef: React.MutableRefObject<boolean>
+  sessionStartedRef: React.MutableRefObject<boolean>,
 ) {
   const [isRecording, setIsRecording] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const smoothedLevelRef = useRef(0);
 
   const startRecording = useCallback(async () => {
     if (typeof window === "undefined" || !navigator.mediaDevices) return;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       mediaStreamRef.current = stream;
 
-      const audioCtx = new window.AudioContext({ sampleRate: 16000 });
+      const audioCtx = getSharedAudioContext()!;
       audioContextRef.current = audioCtx;
 
       await audioCtx.audioWorklet.addModule("/audio-processor.js");
@@ -28,19 +37,28 @@ export function useAudioRecorder(
 
       workletNode.port.onmessage = (event) => {
         if (!sessionStartedRef.current) return;
-        
+
         if (event.data.type === "audioData") {
           const audioBuffer = event.data.audio;
           send({
-            type: "audio_input",
+            type: "input_audio_buffer.append",
             audio: arrayBufferToBase64(audioBuffer),
           });
+
+          // Smooth the RMS value for a natural visual animation
+          const rms = event.data.rms ?? 0;
+          // Normalize RMS: typical speech is 0.01–0.15, clamp to 0–1
+          const normalized = Math.min(1, rms / 0.12);
+          const smoothing = 0.3;
+          smoothedLevelRef.current =
+            smoothedLevelRef.current * smoothing + normalized * (1 - smoothing);
+          setAudioLevel(smoothedLevelRef.current);
         }
       };
 
       source.connect(workletNode);
       workletNode.connect(audioCtx.destination);
-      
+
       setIsRecording(true);
       sessionStartedRef.current = true;
     } catch (err) {
@@ -58,11 +76,13 @@ export function useAudioRecorder(
       mediaStreamRef.current = null;
     }
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      // Intentionally NOT closing the shared context so the player can still use it
       audioContextRef.current = null;
     }
     setIsRecording(false);
+    setAudioLevel(0);
+    smoothedLevelRef.current = 0;
   }, []);
 
-  return { isRecording, startRecording, stopRecording };
+  return { isRecording, audioLevel, startRecording, stopRecording };
 }

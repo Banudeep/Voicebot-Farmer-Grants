@@ -10,61 +10,33 @@ Supports queries like:
 - "USDA service center in Franklin County"
 """
 
-import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
+from mcp_tools.utils import (
+    CACHE_DIR,
+    AGENCY_NAMES,
+    SERVICE_CENTER_LOCATOR_URL,
+    load_county_db,
+    load_json_cache,
+    normalize_state,
+)
+
 # Paths
-# Path: src/mcp_tools/service_center_tools.py -> src/mcp_tools -> src -> root
-BASE_DIR = Path(__file__).parent.parent.parent
-CACHE_DIR = BASE_DIR / "cache"
 SERVICE_CENTERS_PATH = CACHE_DIR / "service_centers_complete.json"
-COUNTY_DB_PATH = CACHE_DIR / "us_counties.json"
 
 # Cached data (loaded once at import time for speed)
 _SERVICE_CENTERS_CACHE: Optional[Dict] = None
-_COUNTY_DB_CACHE: Optional[Dict] = None
 
 
 def _load_service_centers() -> Dict[str, Any]:
     """Load and cache service center data"""
     global _SERVICE_CENTERS_CACHE
     if _SERVICE_CENTERS_CACHE is None:
-        if SERVICE_CENTERS_PATH.exists():
-            with SERVICE_CENTERS_PATH.open("r", encoding="utf-8") as f:
-                _SERVICE_CENTERS_CACHE = json.load(f)
-        else:
-            _SERVICE_CENTERS_CACHE = {"counties": {}}
+        _SERVICE_CENTERS_CACHE = load_json_cache(
+            SERVICE_CENTERS_PATH, fallback={"counties": {}}
+        )
     return _SERVICE_CENTERS_CACHE
-
-
-def _load_county_db() -> Dict[str, Any]:
-    """Load and cache the county database"""
-    global _COUNTY_DB_CACHE
-    if _COUNTY_DB_CACHE is None:
-        if COUNTY_DB_PATH.exists():
-            with COUNTY_DB_PATH.open("r", encoding="utf-8") as f:
-                _COUNTY_DB_CACHE = json.load(f)
-        else:
-            _COUNTY_DB_CACHE = {"states": {}, "counties_by_state": {}}
-    return _COUNTY_DB_CACHE
-
-
-def _normalize_state(state_input: str, county_db: Dict) -> Optional[str]:
-    """Convert state name or abbreviation to standard 2-letter code"""
-    state_upper = state_input.upper().strip()
-    
-    # Check if already a valid code
-    if state_upper in county_db.get('states', {}):
-        return state_upper
-    
-    # Check full state name
-    state_lower = state_input.lower().strip()
-    for code, info in county_db.get('states', {}).items():
-        if info.get('name', '').lower() == state_lower:
-            return code
-    
-    return None
 
 
 def _normalize_county_slug(county: str) -> str:
@@ -106,22 +78,22 @@ async def search_service_center(
     """
     try:
         data = _load_service_centers()
-        county_db = _load_county_db()
+        county_db = load_county_db()
         
         # Validate state
         if not state:
             return {
                 "success": False,
                 "error": "State is required. Please specify a state (e.g., 'Iowa' or 'IA').",
-                "locator_url": "https://www.farmers.gov/working-with-us/service-center-locator"
+                "locator_url": SERVICE_CENTER_LOCATOR_URL
             }
         
-        state_code = _normalize_state(state, county_db)
+        state_code = normalize_state(state, county_db)
         if not state_code:
             return {
                 "success": False,
                 "error": f"State '{state}' not recognized. Use a state name or two-letter code.",
-                "locator_url": "https://www.farmers.gov/working-with-us/service-center-locator"
+                "locator_url": SERVICE_CENTER_LOCATOR_URL
             }
         
         # Validate county
@@ -129,7 +101,7 @@ async def search_service_center(
             return {
                 "success": False,
                 "error": "County is required. Please specify a county name.",
-                "locator_url": "https://www.farmers.gov/working-with-us/service-center-locator"
+                "locator_url": SERVICE_CENTER_LOCATOR_URL
             }
         
         # Try 1: Direct lookup
@@ -176,7 +148,7 @@ async def search_service_center(
                 "results": None,
                 "message": f"No service center data found for {county}, {state_name}.",
                 "dashboard_url": f"https://www.farmers.gov/dashboard/{state_name.lower().replace(' ', '-')}/{_normalize_county_slug(county)}",
-                "locator_url": "https://www.farmers.gov/working-with-us/service-center-locator"
+                "locator_url": SERVICE_CENTER_LOCATOR_URL
             }
         
         # Filter by agency if specified
@@ -199,11 +171,7 @@ async def search_service_center(
         for agency_code, info in service_centers.items():
             formatted = {
                 "agency": agency_code,
-                "agency_name": {
-                    "FSA": "Farm Service Agency",
-                    "NRCS": "Natural Resources Conservation Service", 
-                    "RD": "Rural Development"
-                }.get(agency_code, agency_code),
+                "agency_name": AGENCY_NAMES.get(agency_code, agency_code),
                 "service_center": info.get("service_center", ""),
                 "contact_name": info.get("contact_name", ""),
                 "email": info.get("email", ""),
@@ -226,7 +194,7 @@ async def search_service_center(
         return {
             "success": False,
             "error": str(e),
-            "locator_url": "https://www.farmers.gov/working-with-us/service-center-locator"
+            "locator_url": SERVICE_CENTER_LOCATOR_URL
         }
 
 
@@ -304,6 +272,6 @@ if __name__ == "__main__":
             print(f"   Dashboard: {result.get('dashboard_url')}")
         
         print("\n" + "=" * 60)
-        print("✅ Tests complete!")
+        print("Tests complete!")
     
     asyncio.run(test())

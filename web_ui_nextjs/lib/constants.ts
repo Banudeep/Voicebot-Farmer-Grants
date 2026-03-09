@@ -18,17 +18,23 @@ export interface VoiceOption {
 }
 
 export const VOICE_OPTIONS: VoiceOption[] = [
-  { id: "voiceCardSarah", name: "Sarah", style: "Natural", value: "en-US-JennyNeural" },
-  { id: "voiceCardDavid", name: "David", style: "Formal", value: "en-US-DavisNeural" },
+  {
+    id: "voiceCardSarah",
+    name: "Sarah",
+    style: "Natural",
+    value: "en-US-JennyNeural",
+  },
+  {
+    id: "voiceCardDavid",
+    name: "David",
+    style: "Formal",
+    value: "en-US-DavisNeural",
+  },
 ];
 
 export const TARGET_SAMPLE_RATE = 16000;
-export const FRAME_SIZE_MS = 20;
-export const FRAME_SIZE_SAMPLES = (TARGET_SAMPLE_RATE * FRAME_SIZE_MS) / 1000;
 export const KEEPALIVE_INTERVAL_MS = 15000;
-export const AUDIO_PREBUFFER_MS = 100;
 export const BYTES_PER_SECOND = TARGET_SAMPLE_RATE * 2;
-export const PREBUFFER_BYTES = Math.floor((AUDIO_PREBUFFER_MS / 1000) * BYTES_PER_SECOND);
 export const STREAM_RENDER_INTERVAL_MS = 50;
 
 export const QUICK_ACTIONS = [
@@ -53,8 +59,4 @@ export function decodeBase64ToUint8(base64: string): Uint8Array {
     bytes[i] = decoded.charCodeAt(i);
   }
   return bytes;
-}
-
-export function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

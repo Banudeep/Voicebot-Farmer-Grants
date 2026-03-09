@@ -195,4 +195,4 @@ if __name__ == "__main__":
     result = format_tool_result(test_data)
     print(f"Formatted result length: {len(result)}")
     print(f"Result preview: {result[:500]}...")
-    print("✓ Result formatter test complete")
+    print("Result formatter test complete")

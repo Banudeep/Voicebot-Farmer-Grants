@@ -212,6 +212,6 @@ if __name__ == "__main__":
         print(f"Result 2: {result2}")
         
         print(f"Cache stats: {get_cache_stats()}")
-        print("✓ Cache manager test complete")
+        print("Cache manager test complete")
     
     asyncio.run(test())

@@ -3,6 +3,7 @@ Speech-to-Text Streaming Module
 Uses Azure Speech Services
 """
 import asyncio
+import traceback
 import config
 import azure.cognitiveservices.speech as speechsdk
 from azure.cognitiveservices.speech.audio import AudioStreamFormat, PushAudioInputStream
@@ -32,20 +33,7 @@ class STTStream:
     
     def _init_azure(self):
         """Initialize Azure Speech client"""
-        if not config.AZURE_SPEECH_KEY or not config.AZURE_SPEECH_REGION:
-            raise ValueError("AZURE_SPEECH_KEY and AZURE_SPEECH_REGION must be set for Azure Speech")
-        
-        # Create speech config
-        if config.AZURE_SPEECH_ENDPOINT:
-            self.speech_config = speechsdk.SpeechConfig(
-                endpoint=config.AZURE_SPEECH_ENDPOINT,
-                subscription=config.AZURE_SPEECH_KEY
-            )
-        else:
-            self.speech_config = speechsdk.SpeechConfig(
-                subscription=config.AZURE_SPEECH_KEY,
-                region=config.AZURE_SPEECH_REGION
-            )
+        self.speech_config = config.create_speech_config()
         
         self.speech_config.speech_recognition_language = config.AZURE_SPEECH_LANGUAGE
         
@@ -66,7 +54,7 @@ class STTStream:
     async def connect(self):
         """Connect to Azure Speech STT service"""
         try:
-            print("🔌 Starting Azure Speech STT connection...")
+            print("Starting Azure Speech STT connection...")
             print(f"   Language: {config.AZURE_SPEECH_LANGUAGE}")
             print(f"   Sample Rate: {config.STT_SAMPLE_RATE}")
             
@@ -105,15 +93,31 @@ class STTStream:
             self.recognizer.start_continuous_recognition_async()
             
             self.is_connected = True
-            print("✓ Azure Speech STT connected!")
+            print("Azure Speech STT connected!")
             return True
             
         except Exception as e:
-            print(f"❌ Azure Speech STT connection error: {e}")
-            import traceback
+            print(f"[ERROR] Azure Speech STT connection error: {e}")
             traceback.print_exc()
             return False
     
+    def _on_azure_session_started(self, evt):
+        """Handle session started event."""
+        if config.DEBUG:
+            print(f"Azure Speech session started: {evt.session_id}")
+
+    def _on_azure_session_stopped(self, evt):
+        """Handle session stopped event."""
+        if config.DEBUG:
+            print(f"Azure Speech session stopped: {evt.session_id}")
+
+    def _on_azure_canceled(self, evt):
+        """Handle recognition canceled event."""
+        cancellation = evt.result.cancellation_details
+        print(f"[WARN] Azure Speech canceled: {cancellation.reason}")
+        if cancellation.reason == speechsdk.CancellationReason.Error:
+            print(f"   Error details: {cancellation.error_details}")
+
     def _on_azure_recognizing(self, evt):
         """Handle interim recognition results (partial transcripts)."""
         try:
@@ -123,7 +127,7 @@ class STTStream:
                     self._queue_result({"text": transcript, "is_final": False})
         except Exception as e:
             if config.DEBUG:
-                print(f"⚠️ Azure Speech interim result error: {e}")
+                print(f"[WARN] Azure Speech interim result error: {e}")
     
     def _on_azure_recognized(self, evt):
         """Handle final recognition result (after silence detected)."""
@@ -132,32 +136,14 @@ class STTStream:
                 transcript = evt.result.text.strip()
                 if transcript and transcript != self._last_transcript:
                     self._last_transcript = transcript
-                    print(f"\n✅ 📝 TRANSCRIPT (FINAL): {transcript}")
+                    print(f"\nTRANSCRIPT (FINAL): {transcript}")
                     self._queue_result({"text": transcript, "is_final": True})
             elif evt.result.reason == speechsdk.ResultReason.NoMatch:
                 if config.VERBOSE:
-                    print("⚠️ Azure Speech: No speech could be recognized")
+                    print("[WARN] Azure Speech: No speech could be recognized")
         except Exception as e:
-            print(f"❌ Azure Speech recognition error: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _on_azure_session_started(self, evt):
-        """Handle Azure Speech session started"""
-        if config.DEBUG:
-            print("🔗 Azure Speech session started")
-    
-    def _on_azure_session_stopped(self, evt):
-        """Handle Azure Speech session stopped"""
-        if config.DEBUG:
-            print("🔌 Azure Speech session stopped")
-    
-    def _on_azure_canceled(self, evt):
-        """Handle Azure Speech cancellation"""
-        if evt.reason == speechsdk.CancellationReason.Error:
-            print(f"❌ Azure Speech error: {evt.error_details}")
-        self.is_connected = False
-    
+            print(f"[ERROR] Azure Speech recognition error: {e}")
+
     async def send_audio(self, audio_data: bytes):
         """Send audio data for transcription"""
         if self.push_stream and self.is_connected:
@@ -165,10 +151,10 @@ class STTStream:
                 # Azure expects audio data as bytes
                 self.push_stream.write(audio_data)
             except Exception as e:
-                print(f"⚠️ Error sending audio to Azure Speech: {e}")
+                print(f"[WARN] Error sending audio to Azure Speech: {e}")
         else:
             if not self._warned_disconnected:
-                print(f"⚠️ Cannot send audio: Azure Speech not connected")
+                print(f"[WARN] Cannot send audio: Azure Speech not connected")
                 self._warned_disconnected = True
     
     async def get_transcript(self) -> str:
@@ -191,7 +177,7 @@ class STTStream:
                 pass
         
         if config.DEBUG:
-            print("🔌 Azure Speech STT disconnected")
+            print("Azure Speech STT disconnected")
 
 
 async def test_stt():
@@ -208,12 +194,12 @@ async def test_stt():
             stt.get_transcript(),
             timeout=10.0
         )
-        print(f"✓ Received: {result}")
+        print(f"Received: {result}")
     except asyncio.TimeoutError:
-        print("⚠️ No speech detected")
+        print("[WARN] No speech detected")
     
     await stt.close()
-    print("✓ STT test complete")
+    print("STT test complete")
 
 
 if __name__ == "__main__":

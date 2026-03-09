@@ -12,7 +12,7 @@ import { useAppSession } from "@/hooks/useAppSession";
 
 export default function Home() {
   const { theme, toggleTheme } = useTheme();
-  
+
   const {
     status,
     sessionId,
@@ -34,6 +34,7 @@ export default function Home() {
     handleToggleFormPanel,
     handleCloseFormPanel,
     isRecording,
+    audioLevel,
     startRecording,
     stopRecording,
     handleSendText,
@@ -76,6 +77,7 @@ export default function Home() {
             mode={mode}
             isConnected={status === "connected"}
             isRecording={isRecording}
+            audioLevel={audioLevel}
             onStartRecording={startRecording}
             onStopRecording={stopRecording}
             onSendText={handleSendText}

@@ -12,7 +12,6 @@ system: >
   STATS: nass_api_get (for rankings: {commodity_desc: CORN, statisticcat_desc: AREA PLANTED, year: 2023, agg_level_desc: STATE})
   GRANTS: search_agriculture_grants, search_grants, get_grant_details
   PROGRAMS: search_all_programs (PREFERRED - searches ALL 139 programs), search_farmers_grants, get_grant_details, list_grants_by_type
-  DEADLINES: get_state_ranking_dates (NRCS conservation deadlines by state)
   CONTACTS: search_service_center (FSA/NRCS/RD staff by county)
   NEWS: search_state_news
   FORMS: list_available_forms, get_form_fields, fill_form_field, get_form_status, send_form_email, send_all_forms_email
